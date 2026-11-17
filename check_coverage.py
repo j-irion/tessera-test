@@ -1,5 +1,6 @@
-"""Compare HyBiomass Africa GEDI pixel centers to Tessera tile inventories."""
+"""Compare HyBiomass GEDI pixel centers to Tessera tile inventories."""
 
+import argparse
 import csv
 import tarfile
 from pathlib import Path
@@ -11,6 +12,7 @@ from rasterio.io import MemoryFile
 
 DATA = Path("data")
 YEARS = range(2019, 2025)
+REGIONS = ("africa", "australasia", "europe", "north_america", "north_asia", "south_america", "south_asia")
 
 
 def tile_keys(lon, lat):
@@ -19,8 +21,11 @@ def tile_keys(lon, lat):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("region", choices=REGIONS)
+    region = parser.parse_args().region
     dates = pd.read_csv(DATA / "hybiomass_tiles_datetime_ids.csv", dtype=str)
-    dates = dates[dates.region == "Africa"].set_index("tile_index").datetime_id
+    dates = dates[dates.region == region.title()].set_index("tile_index").datetime_id
     inventories = {}
     for variant in ("beta1", "beta2"):
         frame = pd.read_parquet(DATA / f"coverage/v2-{variant}-manifest.parquet")
@@ -29,10 +34,11 @@ def main():
             for year, group in frame.groupby("year")
         }
 
-    output = DATA / "coverage/africa_gedi_coverage.csv"
-    if output.exists():
-        raise FileExistsError(f"Refusing to overwrite {output}")
-    with tarfile.open(DATA / "hybiomass_africa.tar.gz", "r|gz") as archive, output.open("x", newline="") as f:
+    output = DATA / f"coverage/{region}_gedi_coverage.csv"
+    partial = output.with_suffix(".csv.part")
+    if output.exists() or partial.exists():
+        raise FileExistsError(f"Refusing to overwrite {output} or {partial}")
+    with tarfile.open(DATA / f"hybiomass_{region}.tar.gz", "r|gz") as archive, partial.open("x", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["patch", "enmap_year", "gedi_pixels", "variant", "year", "covered_pixels"])
         count = 0
@@ -54,8 +60,10 @@ def main():
                                      sum(key in available for key in keys)])
             count += 1
             if count % 50 == 0:
-                print(f"Checked {count} patches", flush=True)
-        print(f"Checked {count} patches; saved {output}", flush=True)
+                print(f"{region}: checked {count} patches", flush=True)
+    output.hardlink_to(partial)
+    partial.unlink()
+    print(f"{region}: checked {count} patches; saved {output}", flush=True)
 
 
 if __name__ == "__main__":

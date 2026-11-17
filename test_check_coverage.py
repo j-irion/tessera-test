@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from check_africa_coverage import tile_keys
+from check_coverage import tile_keys
 
 
 class TileKeysTest(unittest.TestCase):
