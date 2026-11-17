@@ -15,8 +15,7 @@ class RemainingDownloadTest(unittest.TestCase):
                 os.chdir(directory)
                 Path("data").mkdir()
                 Path("data/hybiomass_europe.tar.gz").write_bytes(b"existing")
-                with patch("builtins.input", return_value="user"), \
-                     patch.object(download_remaining, "getpass", return_value="password"), \
+                with patch.object(download_remaining, "credentials", return_value=("user", "password")), \
                      patch.object(download_remaining, "sign_in"), \
                      patch.object(download_remaining, "download") as download:
                     download_remaining.main()

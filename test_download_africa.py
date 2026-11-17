@@ -5,7 +5,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from download_africa import download
+from download_africa import credentials, download
 
 
 class DownloadTest(unittest.TestCase):
@@ -30,9 +30,17 @@ class DownloadTest(unittest.TestCase):
         session.get.return_value.__enter__.return_value = response
         output = io.StringIO()
         with tempfile.TemporaryDirectory() as directory, redirect_stdout(output):
-            with patch("download_africa.monotonic", side_effect=[0, 2, 2]):
+            with patch("download_africa.monotonic", side_effect=[0, 6, 6]):
                 download(session, Path(directory) / "archive.gz")
         self.assertIn("100.0%", output.getvalue())
+
+    def test_credentials_from_env_and_prompt_fallback(self):
+        with patch("download_africa.dotenv_values", return_value={"DLR_USERNAME": "user", "DLR_PASSWORD": "secret"}):
+            self.assertEqual(credentials(), ("user", "secret"))
+        with patch("download_africa.dotenv_values", return_value={}), \
+             patch("builtins.input", return_value="user"), \
+             patch("download_africa.getpass", return_value="secret"):
+            self.assertEqual(credentials(), ("user", "secret"))
 
     def test_reject_login_page(self):
         response = MagicMock()
