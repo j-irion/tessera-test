@@ -1,11 +1,13 @@
 """Download HyBiomass Africa using DLR credentials and aria2."""
 
+from copy import copy
 from getpass import getpass
 from http.cookiejar import MozillaCookieJar
 from pathlib import Path
 import os
 import subprocess
 import tempfile
+import time
 
 import requests
 from dotenv import dotenv_values
@@ -36,6 +38,10 @@ def download(session, dest, url=URL):
     try:
         jar = MozillaCookieJar(cookie_path)
         for cookie in session.cookies:
+            cookie = copy(cookie)
+            if cookie.expires is None:
+                cookie.expires = int(time.time()) + 3600
+                cookie.discard = False
             jar.set_cookie(cookie)
         jar.save(ignore_discard=True)
         print(f"Downloading {dest.name} (up to 4 connections)...", flush=True)
@@ -43,7 +49,8 @@ def download(session, dest, url=URL):
             "aria2c", "--no-conf=true", "--continue=true", "--max-connection-per-server=4",
             "--split=4", "--min-split-size=1M", "--max-concurrent-downloads=1",
             "--auto-file-renaming=false", "--allow-overwrite=false", "--summary-interval=5",
-            f"--load-cookies={cookie_path}", f"--dir={dest.parent.resolve()}",
+            f"--load-cookies={cookie_path}", f"--user-agent={session.headers['User-Agent']}",
+            f"--dir={dest.parent.resolve()}",
             f"--out={partial.name}", url,
         ], check=True)
     finally:
