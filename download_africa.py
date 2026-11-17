@@ -49,6 +49,7 @@ def download(session, dest, url=URL):
             "aria2c", "--no-conf=true", "--continue=true", "--max-connection-per-server=4",
             "--split=4", "--min-split-size=1M", "--max-concurrent-downloads=1",
             "--auto-file-renaming=false", "--allow-overwrite=false", "--summary-interval=5",
+            "--auto-save-interval=5",
             f"--load-cookies={cookie_path}", f"--user-agent={session.headers['User-Agent']}",
             f"--dir={dest.parent.resolve()}",
             f"--out={partial.name}", url,
