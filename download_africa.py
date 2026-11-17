@@ -41,7 +41,7 @@ def main():
     password = getpass("DLR password (not displayed): ")
     with requests.Session() as session:
         session.trust_env = False
-        sign_in(session, URL, (username, password), sensor="ENMAP")
+        sign_in(session, URL.rsplit("/", 1)[0] + "/", (username, password), sensor="ENMAP")
         del password
         download(session, DEST)
 
