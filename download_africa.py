@@ -11,11 +11,11 @@ URL = "https://download.geoservice.dlr.de/ENMAP/files/HYBIOMASS/hybiomass_africa
 DEST = Path("data/hybiomass_africa.tar.gz")
 
 
-def download(session, dest):
+def download(session, dest, url=URL):
     partial = dest.with_suffix(dest.suffix + ".part")
     if dest.exists() or partial.exists():
         raise FileExistsError(f"Refusing to overwrite {dest} or {partial}")
-    with session.get(URL, stream=True, timeout=(30, 120)) as response:
+    with session.get(url, stream=True, timeout=(30, 120)) as response:
         response.raise_for_status()
         chunks = response.iter_content(chunk_size=1024 * 1024)
         first = next(chunks, b"")
