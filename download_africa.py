@@ -2,6 +2,7 @@
 
 from getpass import getpass
 from pathlib import Path
+from time import monotonic
 
 import requests
 from hyperproc.archive.dlr import sign_in
@@ -20,10 +21,23 @@ def download(session, dest):
         first = next(chunks, b"")
         if not first.startswith(b"\x1f\x8b"):
             raise ValueError("Server did not return a gzip archive; check DLR access")
+        expected = response.headers.get("Content-Length")
+        total = int(expected) if expected is not None else None
+        downloaded = len(first)
+        last_update = monotonic()
+        print("Downloading...", flush=True)
         with partial.open("xb") as output:
             output.write(first)
             for chunk in chunks:
                 output.write(chunk)
+                downloaded += len(chunk)
+                if monotonic() - last_update >= 1:
+                    progress = f"{downloaded / 1024**3:.2f} GiB"
+                    if total:
+                        progress += f" / {total / 1024**3:.2f} GiB ({downloaded / total:.1%})"
+                    print(f"\r{progress}", end="", flush=True)
+                    last_update = monotonic()
+        print()
     expected = response.headers.get("Content-Length")
     if expected is not None and partial.stat().st_size != int(expected):
         raise IOError("Incomplete download; partial file retained")
@@ -41,6 +55,7 @@ def main():
     password = getpass("DLR password (not displayed): ")
     with requests.Session() as session:
         session.trust_env = False
+        print("Signing in to DLR...", flush=True)
         sign_in(session, URL.rsplit("/", 1)[0] + "/", (username, password), sensor="ENMAP")
         del password
         download(session, DEST)
