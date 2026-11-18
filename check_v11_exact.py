@@ -96,7 +96,13 @@ def main():
             save_new(pd.DataFrame({"row": indices[take], "valid": valid}), result_path)
             print(f"{args.region}: zone {zone:02d}, {year}, batch {batch + 1}/{batch_count}; "
                   f"{len(take)} pixels; {time.monotonic() - started:.0f}s elapsed", flush=True)
-    print(f"{args.region}: all batches complete", flush=True)
+    parts = [pd.read_parquet(path) for path in sorted(directory.glob("zone*.parquet"))]
+    results = pd.concat(parts, ignore_index=True).sort_values("row")
+    if len(results) != len(labels) or not np.array_equal(results.row.to_numpy(), np.arange(len(labels))):
+        raise ValueError("Checkpoint rows do not match the label locations")
+    valid = int(results.valid.sum())
+    print(f"{args.region}: {valid:,}/{len(labels):,} valid label pixels "
+          f"({valid / len(labels):.2%}); {time.monotonic() - started:.0f}s elapsed", flush=True)
 
 
 if __name__ == "__main__":
