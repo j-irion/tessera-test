@@ -1,5 +1,6 @@
 .venv/
 .venv-dlr/
+.venv-v11/
 data/
 __pycache__/
 .env
