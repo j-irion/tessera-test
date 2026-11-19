@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from train_hybiomass import UNet, patch_rmse, split_paths, target_stats
+from train_hybiomass import UNet, patch_rmse, save_checkpoint, split_paths, target_stats
 
 
 class TrainingTest(unittest.TestCase):
@@ -27,6 +27,14 @@ class TrainingTest(unittest.TestCase):
             path = Path(directory) / "patch.npz"
             np.savez(path, target=np.array([1., np.nan, 3.]))
             self.assertEqual(target_stats([path]), (2.0, 1.0))
+
+    def test_atomic_checkpoint_round_trip(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "best.pt"
+            save_checkpoint(path, {"epoch": 1})
+            self.assertEqual(torch.load(path, weights_only=True)["epoch"], 1)
+            save_checkpoint(path, {"epoch": 2})
+            self.assertEqual(torch.load(path, weights_only=True)["epoch"], 2)
 
     def test_model_output_shape(self):
         model = UNet().eval()

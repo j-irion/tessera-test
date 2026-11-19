@@ -139,6 +139,16 @@ def evaluate(model, loader, device, mean, std):
             "r2": 1 - sse / denominator if denominator > 0 else None, "labels": count}
 
 
+def save_checkpoint(path, checkpoint):
+    with tempfile.NamedTemporaryFile(dir=path.parent, prefix="checkpoint-", suffix=".pt", delete=False) as f:
+        temporary = Path(f.name)
+    try:
+        torch.save(checkpoint, temporary)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", type=Path, default=Path("data/prepared"))
@@ -197,18 +207,14 @@ def main():
             f.write(json.dumps(summary) + "\n")
         if val["mean_patch_rmse_mg_ha"] < best:
             best = val["mean_patch_rmse_mg_ha"]
-            with tempfile.NamedTemporaryFile(dir=args.run, prefix=".checkpoint-", delete=False) as f:
-                temporary = Path(f.name)
-            try:
-                torch.save({"model": model.state_dict(), "epoch": epoch, "target_mean": mean,
-                            "target_std": std}, temporary)
-                os.replace(temporary, args.run / "best.pt")
-            finally:
-                temporary.unlink(missing_ok=True)
+            save_checkpoint(args.run / "best.pt", {"model": model.state_dict(), "epoch": epoch,
+                                                     "target_mean": mean, "target_std": std})
     model.load_state_dict(torch.load(args.run / "best.pt", map_location=device, weights_only=True)["model"])
     result = evaluate(model, loaders["test"], device, mean, std)
     (args.run / "test_metrics.json").write_text(json.dumps(result, indent=2) + "\n")
     print("Test:", json.dumps(result), flush=True)
+    if device.type == "cuda":
+        print(f"Peak GPU memory allocated: {torch.cuda.max_memory_allocated() / 1024**3:.2f} GiB", flush=True)
 
 
 if __name__ == "__main__":
