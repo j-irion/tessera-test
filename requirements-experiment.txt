@@ -1,0 +1,2 @@
+geotessera @ git+https://github.com/ucam-eo/geotessera.git@3cef6c20eebb59608115523ecea3127aaceef86d
+torch==2.15.0
