@@ -9,12 +9,12 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import rasterio
 from geotessera import GeoTesseraZarr
+from geotessera.store import _zone_for_lon, _zones_spanned
 from pyproj import Transformer
 from rasterio.enums import Resampling
 from rasterio.io import MemoryFile
-from rasterio.warp import reproject
+from rasterio.warp import reproject, transform_bounds
 
 from check_coverage import DATA, REGIONS
 
@@ -35,6 +35,34 @@ def aggregate_embeddings(embeddings, source_transform, source_crs, target_shape,
     reproject(good.astype(np.float32), fraction, src_nodata=None, dst_nodata=0, **common)
     valid = (fraction >= 0.9999) & np.isfinite(result).all(axis=0)
     result[:, ~valid] = 0
+    return result, valid
+
+
+def read_and_aggregate(client, image, year):
+    """Read native-grid embeddings, then average directly onto the target grid."""
+    bounds = image.bounds
+    padded = (bounds.left - 30, bounds.bottom - 30, bounds.right + 30, bounds.top + 30)
+    to_wgs84 = Transformer.from_crs(image.crs, "EPSG:4326", always_xy=True)
+    cx, cy = image.transform * (image.width / 2, image.height / 2)
+    lon, _ = to_wgs84.transform(cx, cy)
+    corners = [to_wgs84.transform(x, y)[0] for x in (bounds.left, bounds.right)
+               for y in (bounds.bottom, bounds.top)]
+    primary = _zone_for_lon(lon)
+    zones = [primary] + [zone for zone in _zones_spanned(corners, lon) if zone != primary]
+    result = np.zeros((128, image.height, image.width), dtype=np.float32)
+    valid = np.zeros((image.height, image.width), dtype=bool)
+    for zone in zones:
+        ds = client.open_zone(zone=zone)
+        source_crs = ds.tessera.crs
+        source_bounds = transform_bounds(image.crs, source_crs, *padded, densify_pts=21)
+        vectors, source_transform = ds.tessera.read_region(source_bounds, year)
+        values, available = aggregate_embeddings(vectors, source_transform, source_crs,
+                                                 (image.height, image.width), image.transform, image.crs)
+        use = available & ~valid
+        result[:, use] = values[:, use]
+        valid |= available
+        if valid.all():
+            break
     return result, valid
 
 
@@ -78,22 +106,13 @@ def prepare(region, output, limit=None, max_per_tile=None):
                 continue
             year = int(dates.loc[tile][:4])
             with MemoryFile(archive.extractfile(member).read()) as memory, memory.open() as image:
-                if image.count != 204 or image.crs is None:
+                if (image.count != 204 or image.crs is None or image.width != 128 or image.height != 128
+                        or image.transform.b != 0 or image.transform.d != 0
+                        or not np.isclose(image.transform.a, 30) or not np.isclose(image.transform.e, -30)):
                     raise ValueError(f"Unexpected raster layout: {member.name}")
                 transform, crs = image.transform, image.crs
-                shape = (image.height, image.width)
                 target = image.read(image.count - 1).astype(np.float32)
-                center_x, center_y = transform * (image.width / 2, image.height / 2)
-                lon, lat = Transformer.from_crs(crs, "EPSG:4326", always_xy=True).transform(center_x, center_y)
-                # read_patch pads the footprint so each 30 m pixel has a complete 10 m source area.
-                width = max(image.width * abs(transform.a), image.height * abs(transform.e))
-                size = int(np.ceil(width / 10)) + 8
-                if size % 2:
-                    size += 1
-                vectors, source_transform, source_crs = client.read_patch(
-                    lon, lat, year=year, size_px=size, dst_crs=str(crs), resampling="nearest")
-                embeddings, valid = aggregate_embeddings(vectors, source_transform, source_crs,
-                                                          shape, transform, crs)
+                embeddings, valid = read_and_aggregate(client, image, year)
                 target[~np.isfinite(target) | ~valid] = np.nan
                 if not np.isfinite(target).any():
                     print(f"[{visited}] {member.name}: no usable labels, skipping", flush=True)

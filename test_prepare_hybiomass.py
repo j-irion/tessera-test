@@ -27,6 +27,13 @@ class AlignmentTest(unittest.TestCase):
         self.assertTrue(valid[0, 0])
         self.assertAlmostEqual(result[0, 0, 0], 3.0)
 
+    def test_half_pixel_offset_uses_area_weights(self):
+        values = np.broadcast_to(np.arange(6, dtype=np.float32)[None, :, None], (6, 6, 128)).copy()
+        result, valid = aggregate_embeddings(values, from_origin(0, 60, 10, 10), "EPSG:32632",
+                                             (1, 1), from_origin(5, 60, 30, 30), "EPSG:32632")
+        self.assertTrue(valid[0, 0])
+        self.assertAlmostEqual(result[0, 0, 0], 1.5)
+
     def test_no_overwrite(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "patch.npz"
