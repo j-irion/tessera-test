@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from affine import Affine
 from geotessera import GeoTesseraZarr
 from geotessera.store import _zone_for_lon, _zones_spanned
 from pyproj import Transformer
@@ -23,6 +24,9 @@ def aggregate_embeddings(embeddings, source_transform, source_crs, target_shape,
     """Area-average valid embeddings and require full coverage of each target cell."""
     if embeddings.ndim != 3 or embeddings.shape[-1] != 128:
         raise ValueError("Expected an H x W x 128 TESSERA embedding array")
+    # Pad missing source extent so area averages cannot treat raster edges as fully covered.
+    embeddings = np.pad(embeddings, ((4, 4), (4, 4), (0, 0)), constant_values=np.nan)
+    source_transform = source_transform * Affine.translation(-4, -4)
     src = np.moveaxis(embeddings, -1, 0).astype(np.float32, copy=False)
     good = np.isfinite(src).all(axis=0)
     src[:, ~good] = np.nan

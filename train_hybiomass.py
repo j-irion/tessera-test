@@ -176,6 +176,7 @@ def main():
     loaders = {name: DataLoader(PreparedDataset(paths, mean, std), batch_size=args.batch_size,
                                 shuffle=name == "train", num_workers=args.workers,
                                 pin_memory=device.type == "cuda") for name, paths in splits.items()}
+    # shortcut: interrupted runs retain their best model but cannot resume optimizer state, add resume for long runs.
     args.run.mkdir(parents=True, exist_ok=False)
     manifest = {"config": {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
                 "target_mean": mean, "target_std": std,

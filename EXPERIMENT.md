@@ -15,7 +15,7 @@ Prepare one region, or all seven:
 bash prepare_all_hybiomass.sh
 ```
 
-Run long jobs in tmux. The output `data/prepared/<region>/<tile>/<patch>.npz` is written atomically; existing patches are skipped. The command is restartable, but re-reads the compressed archives. It never overwrites an existing patch. Use a separate `--output` directory for any changes to preprocessing settings. A small pilot is possible with `--output data/prepared_pilot_v2 --limit 12 --max-per-tile 1`. Do not use `data/prepared_pilot`: that early pilot used an intermediate shifted 10 m grid and its results are invalid.
+Run long jobs in tmux. The output `data/prepared/<region>/<tile>/<patch>.npz` is written atomically; existing patches are skipped. The command is restartable, but re-reads the compressed archives. It never overwrites an existing patch. Use a separate `--output` directory for any changes to preprocessing settings. A small pilot is possible with `--output data/prepared_pilot_v2 --limit 12 --max-per-tile 1`. Do not mix with `data/prepared_pilot`: that early pilot used an intermediate 10 m grid; the current method reads the native grid directly.
 
 Preparation downloads embeddings, reports progress per patch, and requires significant network traffic and storage. The initial 12-patch pilot used about 85 MiB; the full amount depends on the data and compression. Do not assume labeled-pixel availability implies entire input-patch availability.
 
@@ -31,4 +31,4 @@ Splits are deterministic 70/20/10 by source tile ID, shared across regions so th
 
 `manifest.json` records all patch paths and split assignments; `metrics.jsonl`, `best.pt` and `test_metrics.json` are saved within the new run directory. The best checkpoint can be used for inference, but the current script does not resume optimizer state after an interrupted training run.
 
-Temporal matching uses the EnMAP scene year, not necessarily the GEDI acquisition year. Annual embeddings may include observations after the GEDI measurement. This and mask/aggregation rules must be stated when reporting results. The 12-patch one-epoch pilot is only a pipeline check, not a performance benchmark.
+Temporal matching uses the EnMAP scene year, not necessarily the GEDI acquisition year. Annual embeddings may include observations after the GEDI measurement. This and mask/aggregation rules must be stated when reporting results. The 12-patch one-epoch pilot is only a pipeline check, not a performance benchmark. Earlier pilot runs are kept separate from `data/prepared`.
