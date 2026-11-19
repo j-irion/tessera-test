@@ -111,7 +111,7 @@ def patch_rmse(pred, target):
     return torch.stack(losses).mean()
 
 
-def evaluate(model, loader, device, mean, std):
+def evaluate(model, loader, device, mean, std, clip_negative=False):
     model.eval()
     count = 0
     sse = target_sum = target_squares = patch_sum = 0.0
@@ -124,6 +124,8 @@ def evaluate(model, loader, device, mean, std):
                 mask = torch.isfinite(t)
                 actual = t[mask].double() * std + mean
                 predicted = p[mask].double() * std + mean
+                if clip_negative:
+                    predicted = predicted.clamp_min(0)
                 error = predicted - actual
                 n = actual.numel()
                 count += n
@@ -211,7 +213,7 @@ def main():
             save_checkpoint(args.run / "best.pt", {"model": model.state_dict(), "epoch": epoch,
                                                      "target_mean": mean, "target_std": std})
     model.load_state_dict(torch.load(args.run / "best.pt", map_location=device, weights_only=True)["model"])
-    result = evaluate(model, loaders["test"], device, mean, std)
+    result = evaluate(model, loaders["test"], device, mean, std, clip_negative=True)
     (args.run / "test_metrics.json").write_text(json.dumps(result, indent=2) + "\n")
     print("Test:", json.dumps(result), flush=True)
     if device.type == "cuda":

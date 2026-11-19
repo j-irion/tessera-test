@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from train_hybiomass import UNet, patch_rmse, save_checkpoint, split_paths, target_stats
+from train_hybiomass import UNet, evaluate, patch_rmse, save_checkpoint, split_paths, target_stats
 
 
 class TrainingTest(unittest.TestCase):
@@ -27,6 +27,12 @@ class TrainingTest(unittest.TestCase):
             path = Path(directory) / "patch.npz"
             np.savez(path, target=np.array([1., np.nan, 3.]))
             self.assertEqual(target_stats([path]), (2.0, 1.0))
+
+    def test_evaluation_can_clip_negative_predictions(self):
+        dataset = torch.utils.data.TensorDataset(torch.tensor([[[[-1.0]]]]), torch.tensor([[[[1.0]]]]))
+        loader = torch.utils.data.DataLoader(dataset)
+        result = evaluate(torch.nn.Identity(), loader, torch.device("cpu"), 0, 1, clip_negative=True)
+        self.assertEqual(result["rmse_mg_ha"], 1.0)
 
     def test_atomic_checkpoint_round_trip(self):
         with tempfile.TemporaryDirectory() as directory:
