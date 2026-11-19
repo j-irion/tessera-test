@@ -26,7 +26,7 @@ def aggregate_embeddings(embeddings, source_transform, source_crs, target_shape,
         raise ValueError("Expected an H x W x 128 TESSERA embedding array")
     # Pad missing source extent so area averages cannot treat raster edges as fully covered.
     embeddings = np.pad(embeddings, ((4, 4), (4, 4), (0, 0)), constant_values=np.nan)
-    source_transform = source_transform * Affine.translation(-4, -4)
+    source_transform = source_transform @ Affine.translation(-4, -4)
     src = np.moveaxis(embeddings, -1, 0).astype(np.float32, copy=False)
     good = np.isfinite(src).all(axis=0)
     src[:, ~good] = np.nan
