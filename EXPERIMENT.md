@@ -15,7 +15,7 @@ Prepare one region, or all seven:
 bash prepare_all_hybiomass.sh
 ```
 
-Run long jobs in tmux. The output `data/prepared/<region>/<tile>/<patch>.npz` is written atomically; existing patches are skipped. The command is restartable, but re-reads the compressed archives. It never overwrites an existing patch. Use a separate `--output` directory for any changes to preprocessing settings. A small pilot is possible with `--output data/prepared_pilot_v2 --limit 12 --max-per-tile 1`. Do not mix with `data/prepared_pilot`: that early pilot used an intermediate 10 m grid; the current method reads the native grid directly.
+Run long jobs in tmux. To prepare up to three different regions concurrently, use `bash prepare_parallel_hybiomass.sh` instead of `prepare_all_hybiomass.sh`; never run both at once. The output `data/prepared/<region>/<tile>/<patch>.npz` is written atomically; existing patches are skipped. The command is restartable, but re-reads the compressed archives. It never overwrites an existing patch. Use a separate `--output` directory for any changes to preprocessing settings. A small pilot is possible with `--output data/prepared_pilot_v2 --limit 12 --max-per-tile 1`. Do not mix with `data/prepared_pilot`: that early pilot used an intermediate 10 m grid; the current method reads the native grid directly.
 
 Preparation downloads embeddings, reports progress per patch, and requires significant network traffic and storage. The initial 12-patch pilot used about 85 MiB; the full amount depends on the data and compression. Do not assume labeled-pixel availability implies entire input-patch availability.
 
