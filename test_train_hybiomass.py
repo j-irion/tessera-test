@@ -1,10 +1,13 @@
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 import numpy as np
 import torch
+from unittest.mock import patch
 
+import train_hybiomass
 from train_hybiomass import UNet, evaluate, patch_rmse, save_checkpoint, split_paths, target_stats
 
 
@@ -41,6 +44,31 @@ class TrainingTest(unittest.TestCase):
             self.assertEqual(torch.load(path, weights_only=True)["epoch"], 1)
             save_checkpoint(path, {"epoch": 2})
             self.assertEqual(torch.load(path, weights_only=True)["epoch"], 2)
+
+    def test_resume_restores_epoch_and_optimizer(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            found = {}
+            for i in range(100):
+                tile = f"{i:05d}"
+                found.setdefault(train_hybiomass.split_for_tile(tile), tile)
+            for tile in found.values():
+                path = root / "data" / "africa" / tile / "patch.npz"
+                path.parent.mkdir(parents=True)
+                target = np.full((128, 128), np.nan, np.float32)
+                target[0, :2] = (1, 3)
+                np.savez_compressed(path, embeddings=np.zeros((128, 128, 128), np.float32),
+                                    target=target, valid=np.ones((128, 128), bool))
+            run = root / "run"
+            args = ["train", "--data", str(root / "data"), "--run", str(run), "--device", "cpu",
+                    "--workers", "0", "--epochs", "1"]
+            with patch.object(train_hybiomass, "UNet", lambda: torch.nn.Conv2d(128, 1, 1)), patch.object(sys, "argv", args):
+                train_hybiomass.main()
+            with patch.object(train_hybiomass, "UNet", lambda: torch.nn.Conv2d(128, 1, 1)), patch.object(sys, "argv", args[:-1] + ["2", "--resume"]):
+                train_hybiomass.main()
+            checkpoint = torch.load(run / "last.pt", weights_only=True)
+            self.assertEqual(checkpoint["epoch"], 2)
+            self.assertTrue(checkpoint["optimizer"]["state"])
 
     def test_model_output_shape(self):
         model = UNet().eval()

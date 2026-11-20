@@ -6,6 +6,7 @@ import json
 import os
 import random
 import tempfile
+import time
 from pathlib import Path
 
 import numpy as np
@@ -63,13 +64,15 @@ def split_paths(paths, seed):
 
 def target_stats(paths):
     count, total, squares = 0, 0.0, 0.0
-    for path in paths:
+    for index, path in enumerate(paths, 1):
         with np.load(path, allow_pickle=False) as data:
             target = data["target"]
             values = target[np.isfinite(target)].astype(np.float64)
             count += len(values)
             total += values.sum()
             squares += np.dot(values, values)
+        if index % 2000 == 0 or index == len(paths):
+            print(f"Training label statistics: {index}/{len(paths)} patches", flush=True)
     if not count:
         raise ValueError("No valid training labels")
     mean = total / count
@@ -156,10 +159,11 @@ def main():
     parser.add_argument("--data", type=Path, default=Path("data/prepared"))
     parser.add_argument("--run", type=Path, required=True)
     parser.add_argument("--epochs", type=int, default=80)
-    parser.add_argument("--batch-size", type=int, default=1)
+    parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
+    parser.add_argument("--resume", action="store_true", help="Resume the last completed epoch in --run")
     args = parser.parse_args()
     if args.epochs < 1 or args.batch_size < 1 or args.workers < 0:
         parser.error("epochs and batch size must be positive; workers cannot be negative")
@@ -173,25 +177,47 @@ def main():
         print(f"{name}: {len(paths)} patches, {len({p.parent.name for p in paths})} source tiles", flush=True)
         if not paths:
             raise ValueError(f"{name} split is empty; prepare more source tiles")
-    mean, std = target_stats(splits["train"])
+    split_manifest = {name: [str(path) for path in paths] for name, paths in splits.items()}
+    if args.resume:
+        manifest = json.loads((args.run / "manifest.json").read_text())
+        if manifest["splits"] != split_manifest:
+            raise ValueError("Prepared dataset or split differs from the original run")
+        for key in ("data", "seed", "batch_size", "device"):
+            if manifest["config"][key] != (str(getattr(args, key)) if isinstance(getattr(args, key), Path) else getattr(args, key)):
+                raise ValueError(f"Cannot change {key} when resuming")
+        mean, std = manifest["target_mean"], manifest["target_std"]
+    else:
+        if args.run.exists():
+            raise FileExistsError(f"Refusing to overwrite {args.run}; use --resume if appropriate")
+        print("Calculating training-only label statistics...", flush=True)
+        mean, std = target_stats(splits["train"])
     device = torch.device(args.device)
     loaders = {name: DataLoader(PreparedDataset(paths, mean, std), batch_size=args.batch_size,
                                 shuffle=name == "train", num_workers=args.workers,
                                 pin_memory=device.type == "cuda") for name, paths in splits.items()}
-    # shortcut: interrupted runs retain their best model but cannot resume optimizer state, add resume for long runs.
-    args.run.mkdir(parents=True, exist_ok=False)
-    manifest = {"config": {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
-                "target_mean": mean, "target_std": std,
-                "splits": {name: [str(path) for path in paths] for name, paths in splits.items()}}
-    (args.run / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    if not args.resume:
+        args.run.mkdir(parents=True, exist_ok=False)
+        manifest = {"config": {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
+                    "target_mean": mean, "target_std": std, "splits": split_manifest}
+        (args.run / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     model = UNet().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    best = float("inf")
-    for epoch in range(1, args.epochs + 1):
+    best, first_epoch = float("inf"), 1
+    if args.resume:
+        checkpoint = torch.load(args.run / "last.pt", map_location="cpu", weights_only=True)
+        model.load_state_dict(checkpoint["model"])
+        optimizer.load_state_dict(checkpoint["optimizer"])
+        best, first_epoch = checkpoint["best"], checkpoint["epoch"] + 1
+        torch.set_rng_state(checkpoint["torch_rng"])
+        if device.type == "cuda":
+            torch.cuda.set_rng_state(checkpoint["cuda_rng"], device)
+        print(f"Resuming at epoch {first_epoch}", flush=True)
+    for epoch in range(first_epoch, args.epochs + 1):
+        epoch_started = time.monotonic()
         model.train()
         losses = []
         for batch, (x, target) in enumerate(loaders["train"], 1):
-            x, target = x.to(device), target.to(device)
+            x, target = x.to(device, non_blocking=True), target.to(device, non_blocking=True)
             optimizer.zero_grad(set_to_none=True)
             with torch.autocast(device_type=device.type, dtype=torch.bfloat16, enabled=device.type == "cuda"):
                 pred = model(x)
@@ -204,7 +230,8 @@ def main():
             if batch % 20 == 0 or batch == len(loaders["train"]):
                 print(f"epoch {epoch}/{args.epochs}: train {batch}/{len(loaders['train'])}", flush=True)
         val = evaluate(model, loaders["val"], device, mean, std)
-        summary = {"epoch": epoch, "train_normalized_patch_rmse": float(np.mean(losses)), "validation": val}
+        summary = {"epoch": epoch, "seconds": round(time.monotonic() - epoch_started, 1),
+                   "train_normalized_patch_rmse": float(np.mean(losses)), "validation": val}
         print(json.dumps(summary), flush=True)
         with (args.run / "metrics.jsonl").open("a") as f:
             f.write(json.dumps(summary) + "\n")
@@ -212,6 +239,9 @@ def main():
             best = val["mean_patch_rmse_mg_ha"]
             save_checkpoint(args.run / "best.pt", {"model": model.state_dict(), "epoch": epoch,
                                                      "target_mean": mean, "target_std": std})
+        save_checkpoint(args.run / "last.pt", {"model": model.state_dict(), "optimizer": optimizer.state_dict(),
+                                                 "epoch": epoch, "best": best, "torch_rng": torch.get_rng_state(),
+                                                 "cuda_rng": torch.cuda.get_rng_state(device) if device.type == "cuda" else None})
     model.load_state_dict(torch.load(args.run / "best.pt", map_location=device, weights_only=True)["model"])
     result = evaluate(model, loaders["test"], device, mean, std, clip_negative=True)
     (args.run / "test_metrics.json").write_text(json.dumps(result, indent=2) + "\n")
