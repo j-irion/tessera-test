@@ -69,7 +69,7 @@ def prepare(region, reference, output, limit=None, max_per_tile=None):
                     np.load(path, allow_pickle=False) as matched:
                 if image.count != 204 or image.height != 128 or image.width != 128 or image.crs is None:
                     raise ValueError(f"Unexpected source layout: {member.name}")
-                if str(image.crs) != str(matched["crs"]) or not np.allclose(tuple(image.transform)[:6], matched["transform"]):
+                if str(image.crs) != str(matched["crs"]) or not np.array_equal(tuple(image.transform)[:6], matched["transform"]):
                     raise ValueError(f"Raster grid differs from reference: {member.name}")
                 target = matched["target"]
                 mask = np.isfinite(target)
