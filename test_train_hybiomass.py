@@ -8,7 +8,7 @@ import torch
 from unittest.mock import patch
 
 import train_hybiomass
-from train_hybiomass import UNet, evaluate, patch_rmse, save_checkpoint, split_paths, target_stats
+from train_hybiomass import PreparedDataset, UNet, enmap_stats, evaluate, patch_rmse, save_checkpoint, split_paths, target_stats
 
 
 class TrainingTest(unittest.TestCase):
@@ -62,13 +62,37 @@ class TrainingTest(unittest.TestCase):
             run = root / "run"
             args = ["train", "--data", str(root / "data"), "--run", str(run), "--device", "cpu",
                     "--workers", "0", "--epochs", "1"]
-            with patch.object(train_hybiomass, "UNet", lambda: torch.nn.Conv2d(128, 1, 1)), patch.object(sys, "argv", args):
+            with patch.object(train_hybiomass, "UNet", lambda in_channels: torch.nn.Conv2d(in_channels, 1, 1)), patch.object(sys, "argv", args):
                 train_hybiomass.main()
-            with patch.object(train_hybiomass, "UNet", lambda: torch.nn.Conv2d(128, 1, 1)), patch.object(sys, "argv", args[:-1] + ["2", "--resume"]):
+            with patch.object(train_hybiomass, "UNet", lambda in_channels: torch.nn.Conv2d(in_channels, 1, 1)), patch.object(sys, "argv", args[:-1] + ["2", "--resume"]):
                 train_hybiomass.main()
             checkpoint = torch.load(run / "last.pt", weights_only=True)
             self.assertEqual(checkpoint["epoch"], 2)
             self.assertTrue(checkpoint["optimizer"]["state"])
+
+    def test_enmap_stats_and_shared_label_mask(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target_path = root / "prepared/africa/00001/01.npz"
+            source_path = root / "enmap/africa/00001/01.npz"
+            target_path.parent.mkdir(parents=True)
+            source_path.parent.mkdir(parents=True)
+            target = np.ones((128, 128), np.float32)
+            valid = np.ones((128, 128), bool)
+            valid[0, 0] = False
+            np.savez_compressed(target_path, target=target, valid=valid)
+            image = np.empty((202, 128, 128), np.float32)
+            image[:, :, ::2], image[:, :, 1::2] = 1, 3
+            image[0, 0, 0] = np.nan
+            from prepare_enmap import save_input
+            save_input(source_path, image)
+            mean, std = enmap_stats([target_path], root / "enmap")
+            self.assertAlmostEqual(mean[1], 2.)
+            self.assertAlmostEqual(std[1], 1.)
+            x, y = PreparedDataset([target_path], 0, 1, root / "enmap", mean, std)[0]
+            self.assertEqual(tuple(x.shape), (202, 128, 128))
+            self.assertTrue(torch.isfinite(x).all())
+            self.assertTrue(torch.isnan(y[0, 0, 0]))
 
     def test_model_output_shape(self):
         model = UNet().eval()

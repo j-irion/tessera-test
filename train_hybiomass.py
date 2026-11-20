@@ -29,9 +29,9 @@ class DoubleConv(nn.Module):
 
 class UNet(nn.Module):
     """Two-stage U-Net described in TESSERA supplement A.11."""
-    def __init__(self):
+    def __init__(self, in_channels=128):
         super().__init__()
-        self.down1 = DoubleConv(128, 256)
+        self.down1 = DoubleConv(in_channels, 256)
         self.down2 = DoubleConv(256, 512)
         self.pool = nn.MaxPool2d(2)
         self.bottleneck = DoubleConv(512, 1024)
@@ -82,22 +82,54 @@ def target_stats(paths):
     return float(mean), std
 
 
+def enmap_path(prepared_path, input_dir):
+    return input_dir / prepared_path.parts[-3] / prepared_path.parent.name / prepared_path.name
+
+
+def enmap_stats(paths, input_dir):
+    sums = np.zeros(202, dtype=np.float64)
+    squares = np.zeros(202, dtype=np.float64)
+    counts = np.zeros(202, dtype=np.int64)
+    for index, path in enumerate(paths, 1):
+        with np.load(enmap_path(path, input_dir), allow_pickle=False) as data:
+            sums += data["sums"]
+            squares += data["squares"]
+            counts += data["counts"]
+        if index % 2000 == 0 or index == len(paths):
+            print(f"EnMAP training-only statistics: {index}/{len(paths)} patches", flush=True)
+    if np.any(counts == 0):
+        raise ValueError("EnMAP training data has a band without finite values")
+    mean = sums / counts
+    std = np.sqrt(np.maximum(0, squares / counts - mean ** 2))
+    if not np.isfinite(mean).all() or not np.isfinite(std).all() or np.any(std == 0):
+        raise ValueError("Invalid EnMAP training statistics")
+    return mean.astype(np.float32), std.astype(np.float32)
+
+
 class PreparedDataset(Dataset):
-    def __init__(self, paths, mean, std):
+    def __init__(self, paths, mean, std, input_dir=None, input_mean=None, input_std=None):
         self.paths, self.mean, self.std = paths, mean, std
+        self.input_dir, self.input_mean, self.input_std = input_dir, input_mean, input_std
 
     def __len__(self):
         return len(self.paths)
 
     def __getitem__(self, index):
         with np.load(self.paths[index], allow_pickle=False) as data:
-            embeddings = data["embeddings"].astype(np.float32)
+            embeddings = data["embeddings"].astype(np.float32) if self.input_dir is None else None
             target = data["target"].astype(np.float32)
             valid = data["valid"].astype(bool)
-        if embeddings.shape != (128, 128, 128) or target.shape != (128, 128):
-            raise ValueError(f"Unexpected patch shape: {self.paths[index]}")
-        if not np.isfinite(embeddings).all():
-            raise ValueError(f"Non-finite embedding: {self.paths[index]}")
+        if self.input_dir is not None:
+            with np.load(enmap_path(self.paths[index], self.input_dir), allow_pickle=False) as data:
+                embeddings = data["image"].astype(np.float32)
+            if embeddings.shape != (202, 128, 128):
+                raise ValueError(f"Unexpected EnMAP input shape: {self.paths[index]}")
+            embeddings = (embeddings - self.input_mean[:, None, None]) / self.input_std[:, None, None]
+            np.nan_to_num(embeddings, copy=False, nan=0, posinf=0, neginf=0)
+        elif embeddings.shape != (128, 128, 128):
+            raise ValueError(f"Unexpected TESSERA input shape: {self.paths[index]}")
+        if target.shape != (128, 128) or valid.shape != target.shape or not np.isfinite(embeddings).all():
+            raise ValueError(f"Unexpected or non-finite patch: {self.paths[index]}")
         target[~valid] = np.nan
         if not np.isfinite(target).any():
             raise ValueError(f"Patch has no usable labels: {self.paths[index]}")
@@ -157,6 +189,9 @@ def save_checkpoint(path, checkpoint):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", type=Path, default=Path("data/prepared"))
+    parser.add_argument("--input", choices=("tessera", "enmap"), default="tessera")
+    parser.add_argument("--enmap-data", type=Path, default=Path("data/enmap"))
+    parser.add_argument("--reference-run", type=Path, help="TESSERA run whose exact split and target stats are matched")
     parser.add_argument("--run", type=Path, required=True)
     parser.add_argument("--epochs", type=int, default=80)
     parser.add_argument("--batch-size", type=int, default=4)
@@ -167,6 +202,8 @@ def main():
     args = parser.parse_args()
     if args.epochs < 1 or args.batch_size < 1 or args.workers < 0:
         parser.error("epochs and batch size must be positive; workers cannot be negative")
+    if args.input == "enmap" and args.reference_run is None:
+        parser.error("--reference-run is required for the matched EnMAP baseline")
     if args.device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA is unavailable; no training was started")
     random.seed(args.seed)
@@ -178,29 +215,55 @@ def main():
         if not paths:
             raise ValueError(f"{name} split is empty; prepare more source tiles")
     split_manifest = {name: [str(path) for path in paths] for name, paths in splits.items()}
+    reference = None
+    if args.input == "enmap":
+        reference = json.loads((args.reference_run / "manifest.json").read_text())
+        if reference["splits"] != split_manifest:
+            raise ValueError("Prepared patches or splits do not match the reference run")
+        for key in ("seed", "batch_size"):
+            if reference["config"][key] != getattr(args, key):
+                raise ValueError(f"{key} differs from the reference run")
+        missing = [str(enmap_path(path, args.enmap_data)) for paths in splits.values() for path in paths
+                   if not enmap_path(path, args.enmap_data).is_file()]
+        if missing:
+            raise FileNotFoundError(f"Missing {len(missing)} EnMAP patches, e.g. {missing[0]}")
     if args.resume:
         manifest = json.loads((args.run / "manifest.json").read_text())
         if manifest["splits"] != split_manifest:
             raise ValueError("Prepared dataset or split differs from the original run")
-        for key in ("data", "seed", "batch_size", "device"):
-            if manifest["config"][key] != (str(getattr(args, key)) if isinstance(getattr(args, key), Path) else getattr(args, key)):
+        for key in ("data", "seed", "batch_size", "device", "input", "enmap_data", "reference_run"):
+            original = manifest["config"].get(key, "tessera" if key == "input" else None)
+            current = str(getattr(args, key)) if isinstance(getattr(args, key), Path) else getattr(args, key)
+            if original != current and not (key == "enmap_data" and args.input == "tessera"):
                 raise ValueError(f"Cannot change {key} when resuming")
         mean, std = manifest["target_mean"], manifest["target_std"]
     else:
         if args.run.exists():
             raise FileExistsError(f"Refusing to overwrite {args.run}; use --resume if appropriate")
-        print("Calculating training-only label statistics...", flush=True)
-        mean, std = target_stats(splits["train"])
+        if reference is not None:
+            mean, std = reference["target_mean"], reference["target_std"]
+        else:
+            print("Calculating training-only label statistics...", flush=True)
+            mean, std = target_stats(splits["train"])
+    input_mean = input_std = None
+    if args.input == "enmap":
+        if args.resume:
+            input_mean, input_std = np.array(manifest["input_mean"], np.float32), np.array(manifest["input_std"], np.float32)
+        else:
+            input_mean, input_std = enmap_stats(splits["train"], args.enmap_data)
     device = torch.device(args.device)
-    loaders = {name: DataLoader(PreparedDataset(paths, mean, std), batch_size=args.batch_size,
+    input_dir = args.enmap_data if args.input == "enmap" else None
+    loaders = {name: DataLoader(PreparedDataset(paths, mean, std, input_dir, input_mean, input_std), batch_size=args.batch_size,
                                 shuffle=name == "train", num_workers=args.workers,
                                 pin_memory=device.type == "cuda") for name, paths in splits.items()}
     if not args.resume:
         args.run.mkdir(parents=True, exist_ok=False)
         manifest = {"config": {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
                     "target_mean": mean, "target_std": std, "splits": split_manifest}
+        if input_mean is not None:
+            manifest["input_mean"], manifest["input_std"] = input_mean.tolist(), input_std.tolist()
         (args.run / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    model = UNet().to(device)
+    model = UNet(in_channels=202 if args.input == "enmap" else 128).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
     best, first_epoch = float("inf"), 1
     if args.resume:
