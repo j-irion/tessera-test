@@ -54,38 +54,39 @@ Regional RMSE is affected by biomass distributions, test-set size and GEDI label
 
 | GEDI reference bin (Mg/ha) | Test labels | TESSERA RMSE ↓ (Mg/ha) | EnMAP RMSE ↓ (Mg/ha) |
 |---|---:|---:|---:|
+| 0 to <100 | 580,776 | **60.10** | 72.35 |
 | 100 to <200 | 382,177 | 61.81 | **56.25** |
 | 200 to <300 | 228,146 | **71.46** | 81.32 |
 | 300 to <400 | 102,160 | **118.42** | 150.21 |
 | 400 and above | 47,693 | **186.47** | 233.55 |
 
-The bins use the original GEDI reference value, not the prediction. Intervals include their lower bound and exclude their upper bound; the last bin includes 400. The 580,776 test labels below 100 Mg/ha are excluded from the requested table. Both models were evaluated on the same pixels using their best-validation checkpoints and nonnegative-clipped predictions. RMSE is pooled over pixels in each bin; it is not mean patch RMSE. Higher absolute error in the high-biomass bins does not by itself establish whether predictions are systematically too high or too low.
+The bins use the original GEDI reference value, not the prediction. Intervals include their lower bound and exclude their upper bound; the last bin includes 400. All usable test labels are nonnegative. Both models were evaluated on the same pixels using their best-validation checkpoints and nonnegative-clipped predictions. RMSE is pooled over pixels in each bin; it is not mean patch RMSE. Higher absolute error in the high-biomass bins does not by itself establish whether predictions are systematically too high or too low.
 
 ### Per-region and biomass-bin test RMSE
 
 Each cell is **TESSERA / EnMAP** pixel-weighted RMSE in Mg/ha; lower is better. Bins refer to the GEDI reference and use the same boundaries as above.
 
-| Region | 100 to <200 | 200 to <300 | 300 to <400 | 400+ |
-|---|---:|---:|---:|---:|
-| Africa | 86.89 / 71.56 | 108.09 / 103.21 | 182.09 / 184.90 | 283.61 / 277.31 |
-| Australasia | 65.23 / 62.78 | 73.34 / 75.84 | 131.48 / 145.10 | 205.30 / 227.71 |
-| Europe | 51.72 / 50.02 | 62.12 / 75.77 | 111.94 / 143.86 | 199.02 / 240.32 |
-| North America | 66.31 / 56.08 | 73.76 / 89.89 | 108.08 / 155.98 | 167.33 / 234.97 |
-| North Asia | 54.92 / 53.47 | 76.36 / 77.99 | 119.04 / 141.12 | 182.79 / 219.44 |
-| South America | 62.30 / 63.20 | 69.75 / 67.28 | 141.47 / 143.64 | 243.96 / 249.14 |
-| South Asia | 61.62 / 54.91 | 67.60 / 80.21 | 121.60 / 150.54 | 199.76 / 235.36 |
+| Region | 0 to <100 | 100 to <200 | 200 to <300 | 300 to <400 | 400+ |
+|---|---:|---:|---:|---:|---:|
+| Africa | 27.89 / 36.98 | 86.89 / 71.56 | 108.09 / 103.21 | 182.09 / 184.90 | 283.61 / 277.31 |
+| Australasia | 63.83 / 74.18 | 65.23 / 62.78 | 73.34 / 75.84 | 131.48 / 145.10 | 205.30 / 227.71 |
+| Europe | 44.67 / 60.37 | 51.72 / 50.02 | 62.12 / 75.77 | 111.94 / 143.86 | 199.02 / 240.32 |
+| North America | 60.64 / 71.83 | 66.31 / 56.08 | 73.76 / 89.89 | 108.08 / 155.98 | 167.33 / 234.97 |
+| North Asia | 68.69 / 84.75 | 54.92 / 53.47 | 76.36 / 77.99 | 119.04 / 141.12 | 182.79 / 219.44 |
+| South America | 55.44 / 72.15 | 62.30 / 63.20 | 69.75 / 67.28 | 141.47 / 143.64 | 243.96 / 249.14 |
+| South Asia | 82.88 / 88.26 | 61.62 / 54.91 | 67.60 / 80.21 | 121.60 / 150.54 | 199.76 / 235.36 |
 
 Test GEDI pixel counts, identical for both models:
 
-| Region | 100 to <200 | 200 to <300 | 300 to <400 | 400+ |
-|---|---:|---:|---:|---:|
-| Africa | 2,799 | 1,327 | 298 | 59 |
-| Australasia | 42,706 | 28,205 | 14,209 | 7,739 |
-| Europe | 61,705 | 36,794 | 8,120 | 1,065 |
-| North America | 148,054 | 83,426 | 45,897 | 24,868 |
-| North Asia | 55,537 | 28,873 | 11,666 | 4,605 |
-| South America | 33,012 | 24,688 | 9,396 | 3,149 |
-| South Asia | 38,364 | 24,833 | 12,574 | 6,208 |
+| Region | 0 to <100 | 100 to <200 | 200 to <300 | 300 to <400 | 400+ |
+|---|---:|---:|---:|---:|---:|
+| Africa | 12,631 | 2,799 | 1,327 | 298 | 59 |
+| Australasia | 79,985 | 42,706 | 28,205 | 14,209 | 7,739 |
+| Europe | 101,623 | 61,705 | 36,794 | 8,120 | 1,065 |
+| North America | 226,315 | 148,054 | 83,426 | 45,897 | 24,868 |
+| North Asia | 59,476 | 55,537 | 28,873 | 11,666 | 4,605 |
+| South America | 64,748 | 33,012 | 24,688 | 9,396 | 3,149 |
+| South Asia | 35,998 | 38,364 | 24,833 | 12,574 | 6,208 |
 
 The highest Africa bin has only 59 test labels; results in small or spatially correlated samples may be unstable. No uncertainty intervals were calculated.
 
