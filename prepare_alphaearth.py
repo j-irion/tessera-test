@@ -17,7 +17,7 @@ from rasterio.io import MemoryFile
 from rasterio.transform import array_bounds
 from rasterio.warp import transform_bounds
 from shapely.geometry import box
-from shapely.ops import transform as transform_geometry
+from shapely import transform as transform_geometry
 
 from check_coverage import DATA, REGIONS
 from prepare_hybiomass import aggregate_embeddings, save_patch
@@ -126,8 +126,7 @@ def prepare(region, output, limit=None, max_per_tile=None, workers=16):
                 vectors, valid = normalize_vectors(vectors, valid)
                 target[~valid] = np.nan
                 if not np.isfinite(target).any():
-                    print(f"[{visited}] {member.name}: no usable labels, skipping", flush=True)
-                    continue
+                    print(f"[{visited}] {member.name}: no usable labels; retaining an empty patch for split bookkeeping", flush=True)
                 save_patch(dest, vectors, target, valid, year, image.crs, image.transform,
                            dataset="alphaearth/v1/annual")
                 print(f"[{visited}] {member.name}: {np.isfinite(target).sum()} labels, "

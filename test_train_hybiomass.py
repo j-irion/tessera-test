@@ -8,7 +8,7 @@ import torch
 from unittest.mock import patch
 
 import train_hybiomass
-from train_hybiomass import PreparedDataset, UNet, enmap_stats, evaluate, patch_rmse, save_checkpoint, split_paths, target_stats
+from train_hybiomass import PreparedDataset, UNet, enmap_stats, evaluate, patch_rmse, save_checkpoint, split_paths, target_stats, usable_alphaearth_paths
 
 
 class TrainingTest(unittest.TestCase):
@@ -93,6 +93,20 @@ class TrainingTest(unittest.TestCase):
             self.assertEqual(tuple(x.shape), (202, 128, 128))
             self.assertTrue(torch.isfinite(x).all())
             self.assertTrue(torch.isnan(y[0, 0, 0]))
+
+    def test_alphaearth_missing_labels_are_filtered_without_changing_tile_split(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target_path = root / "prepared/africa/00001/01.npz"
+            source_path = root / "alpha/africa/00001/01.npz"
+            source_path.parent.mkdir(parents=True)
+            np.savez_compressed(source_path, target=np.full((128, 128), np.nan))
+            self.assertEqual(usable_alphaearth_paths([target_path], root / "alpha"), [])
+            np.savez_compressed(source_path, target=np.ones((128, 128)))
+            self.assertEqual(usable_alphaearth_paths([target_path], root / "alpha"), [target_path])
+            source_path.unlink()
+            with self.assertRaises(FileNotFoundError):
+                usable_alphaearth_paths([target_path], root / "alpha")
 
     def test_model_output_shape(self):
         model = UNet().eval()

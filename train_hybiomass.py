@@ -86,6 +86,18 @@ def enmap_path(prepared_path, input_dir):
     return input_dir / prepared_path.parts[-3] / prepared_path.parent.name / prepared_path.name
 
 
+def usable_alphaearth_paths(paths, input_dir):
+    usable = []
+    for path in paths:
+        alternate = enmap_path(path, input_dir)
+        if not alternate.is_file():
+            raise FileNotFoundError(f"Missing AlphaEarth patch: {alternate}")
+        with np.load(alternate, allow_pickle=False) as data:
+            if np.isfinite(data["target"]).any():
+                usable.append(path)
+    return usable
+
+
 def enmap_stats(paths, input_dir):
     sums = np.zeros(202, dtype=np.float64)
     squares = np.zeros(202, dtype=np.float64)
@@ -218,6 +230,8 @@ def main():
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     splits = split_paths(args.data.glob("*/*/*.npz"), args.seed)
+    if args.input == "alphaearth":
+        splits = {name: usable_alphaearth_paths(paths, args.embedding_data) for name, paths in splits.items()}
     for name, paths in splits.items():
         print(f"{name}: {len(paths)} patches, {len({p.parent.name for p in paths})} source tiles", flush=True)
         if not paths:
@@ -226,8 +240,13 @@ def main():
     reference = None
     if args.input != "tessera":
         reference = json.loads((args.reference_run / "manifest.json").read_text())
-        if reference["splits"] != split_manifest:
+        if reference["splits"] != split_manifest and args.input != "alphaearth":
             raise ValueError("Prepared patches or splits do not match the reference run")
+        if args.input == "alphaearth":
+            for name, paths in splits.items():
+                reference_paths = {Path(p) for p in reference["splits"][name]}
+                if any(path not in reference_paths for path in paths):
+                    raise ValueError(f"AlphaEarth {name} patches differ from the reference run")
         for key in ("seed", "batch_size"):
             if reference["config"][key] != getattr(args, key):
                 raise ValueError(f"{key} differs from the reference run")
