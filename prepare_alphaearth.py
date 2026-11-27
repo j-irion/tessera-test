@@ -31,7 +31,7 @@ ENV = {"GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR", "CPL_VSIL_CURL_ALLOWED_EXTEN
 def patch_polygon(image):
     target = box(*array_bounds(image.height, image.width, image.transform))
     crs = Transformer.from_crs(image.crs, "EPSG:4326", always_xy=True)
-    return transform_geometry(crs.transform, target)
+    return transform_geometry(target, crs.transform)
 
 
 def matching_files(index, footprint, year):
