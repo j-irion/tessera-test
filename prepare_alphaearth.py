@@ -52,7 +52,7 @@ def read_source(row, footprint, crs, height, width, workers):
     with rasterio.Env(**ENV), rasterio.open(url) as source:
         if source.count != 64 or source.nodata != -128 or source.dtypes[0] != "int8":
             raise ValueError(f"Unexpected AlphaEarth layout: {url}")
-        bounds = transform_bounds(crs, source.crs, *footprint.bounds, densify_pts=21)
+        bounds = transform_bounds("EPSG:4326", source.crs, *footprint.bounds, densify_pts=21)
         pad = 30
         bounds = (bounds[0] - pad, bounds[1] - pad, bounds[2] + pad, bounds[3] + pad)
         inverse = ~source.transform
