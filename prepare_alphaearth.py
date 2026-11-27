@@ -17,7 +17,7 @@ from rasterio.io import MemoryFile
 from rasterio.transform import array_bounds
 from rasterio.warp import transform_bounds
 from shapely.geometry import box
-from shapely import transform as transform_geometry
+from shapely.ops import transform as transform_geometry
 
 from check_coverage import DATA, REGIONS
 from prepare_hybiomass import aggregate_embeddings, save_patch
@@ -31,7 +31,7 @@ ENV = {"GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR", "CPL_VSIL_CURL_ALLOWED_EXTEN
 def patch_polygon(image):
     target = box(*array_bounds(image.height, image.width, image.transform))
     crs = Transformer.from_crs(image.crs, "EPSG:4326", always_xy=True)
-    return transform_geometry(target, crs.transform)
+    return transform_geometry(crs.transform, target)
 
 
 def matching_files(index, footprint, year):
