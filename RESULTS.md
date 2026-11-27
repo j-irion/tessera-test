@@ -50,6 +50,17 @@ Pixel-weighted RMSE pools errors across all valid labeled pixels. Mean patch RMS
 
 Regional RMSE is affected by biomass distributions, test-set size and GEDI label uncertainty; it is not a complete ranking of geographic difficulty.
 
+### Test pixel-weighted RMSE by GEDI reference biomass
+
+| GEDI reference bin (Mg/ha) | Test labels | TESSERA RMSE ↓ (Mg/ha) | EnMAP RMSE ↓ (Mg/ha) |
+|---|---:|---:|---:|
+| 100 to <200 | 382,177 | 61.81 | **56.25** |
+| 200 to <300 | 228,146 | **71.46** | 81.32 |
+| 300 to <400 | 102,160 | **118.42** | 150.21 |
+| 400 and above | 47,693 | **186.47** | 233.55 |
+
+The bins use the original GEDI reference value, not the prediction. Intervals include their lower bound and exclude their upper bound; the last bin includes 400. The 580,776 test labels below 100 Mg/ha are excluded from the requested table. Both models were evaluated on the same pixels using their best-validation checkpoints and nonnegative-clipped predictions. RMSE is pooled over pixels in each bin; it is not mean patch RMSE. Higher absolute error in the high-biomass bins does not by itself establish whether predictions are systematically too high or too low.
+
 ## Validation and overfitting
 
 | Run | Best epoch | Best validation pixel RMSE (Mg/ha) | Best validation mean patch RMSE (Mg/ha) | Best validation R² | Epoch 80 validation mean patch RMSE (Mg/ha) |
@@ -72,5 +83,6 @@ Training loss continued decreasing after each run's best validation checkpoint w
 - TESSERA run: `~/tessera-test/data/runs/tessera_v11_unet_02/`
 - EnMAP run: `~/tessera-test/data/runs/enmap_unet_01/`
 - Constant baseline metrics: `~/tessera-test/data/runs/mean_baseline.json`
+- Per-biomass-bin test results: `~/tessera-test/data/runs/per_bin_rmse.json`
 - Each model run contains `manifest.json`, `metrics.jsonl`, `best.pt`, `last.pt` and `test_metrics.json`.
 - Preparation/training details: [`EXPERIMENT.md`](EXPERIMENT.md) and [`ENMAP_BASELINE.md`](ENMAP_BASELINE.md).
