@@ -1,48 +1,21 @@
 \documentclass[11pt]{article}
 \usepackage[a4paper,margin=1.8cm]{geometry}
 \usepackage{booktabs}
-\usepackage{longtable}
-\usepackage{array}
 \usepackage{hyperref}
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{3pt}
-\newcommand{\RMSE}{\mathrm{RMSE}}
 
 \title{Biomass Estimation on HyBiomass\\with Satellite Embeddings}
-\author{Experiment report}
+\author{Results summary}
 \date{Status: 27 November 2026}
 
 \begin{document}
 \maketitle
 
-\section*{1. Aim and current status}
+\section*{1. TESSERA embedding coverage}
 \begin{itemize}
-  \item Goal: predict above-ground biomass density (AGBD) from HyBiomass using pretrained satellite embeddings instead of only its EnMAP imagery.
-  \item Compared: TESSERA v1.1 embeddings, original EnMAP bands, and a constant training-mean baseline.
-  \item Main result: TESSERA + U-Net achieved 76.34 Mg/ha test pixel RMSE versus 89.18 Mg/ha for EnMAP + U-Net.
-  \item AlphaEarth: matched preparation is running; training and results are pending.
-\end{itemize}
-
-\section*{2. Data gathering}
-\begin{itemize}
-  \item HyBiomass source: DLR EOC GeoService, following account registration and acceptance of the scientific-use license.
-  \item Downloaded all seven regional archives directly on siena09: about 202 GiB compressed.
-  \item Used authenticated HTTP downloads; final downloads used aria2, one archive at a time, up to four connections per archive.
-  \item All seven archives matched DLR's published MD5 checksums.
-  \item Each patch is a georeferenced $128\times128$ raster at 30 m in a local UTM CRS.
-  \item Channels: 202 EnMAP bands, GEDI-derived AGBD at band index $-2$, and plant functional type at $-1$.
-  \item GEDI labels are sparse estimates, not dense field measurements. Only valid labeled pixels contribute to training and metrics.
-  \item TESSERA v1.1/dclimate embeddings were read from the public annual Zarr/Icechunk store. No foundation-model inference was run locally.
-  \item AlphaEarth annual COGs and their public Parquet index were accessed from Source Cooperative; no Earth Engine credentials were required.
-\end{itemize}
-
-\section*{3. Embedding availability checks}
-\subsection*{TESSERA v2 beta inventory}
-\begin{itemize}
-  \item Checked the center of every GEDI-labeled pixel against published tile inventories for the patch's EnMAP acquisition year.
-  \item Beta1: 621,066 of 14,096,147 labels (4.41\%) fell in listed tiles.
-  \item Beta2: 125,268 labels (0.89\%) fell in listed tiles; all were in Europe.
-  \item These are tile-inventory matches, not checks of exact valid embedding pixels.
+  \item v2: checked every GEDI label center against published tile inventories for the patch's EnMAP year. These are inventory matches, not exact-pixel validity checks.
+  \item Beta2: 125,268 of 14,096,147 labels (0.89\%) matched listed tiles; all were in Europe.
 \end{itemize}
 
 \begin{table}[h]
@@ -66,15 +39,13 @@ Total & 621,066 & 14,096,147 & 4.41 \\
 \end{tabular}
 \end{table}
 
-\subsection*{TESSERA v1.1 actual-pixel availability}
 \begin{itemize}
-  \item Read v1.1 scale values at every GEDI label center, using the patch's EnMAP year and nominal UTM zone.
-  \item A finite scale indicates an available embedding; no 128-channel download was needed for this check.
+  \item v1.1: read the scale value at every GEDI label center for the patch's EnMAP year and nominal UTM zone. A finite scale indicates an available embedding.
 \end{itemize}
 
 \begin{table}[h]
 \centering
-\caption{TESSERA v1.1 valid-pixel coverage before full 30 m aggregation}
+\caption{TESSERA v1.1 valid-pixel coverage before 30 m aggregation}
 \small
 \begin{tabular}{@{}lrrr@{}}
 \toprule
@@ -93,18 +64,15 @@ Total & 14,050,658 & 14,096,147 & 99.68 \\
 \end{tabular}
 \end{table}
 
-\section*{4. Matched data preparation}
+\section*{2. Prepared patches and experiment setup}
 \begin{itemize}
-  \item Read TESSERA on its native 10 m grid; area-averaged vectors directly onto each original 30 m HyBiomass grid.
-  \item Kept all 128 TESSERA channels and spatial context. No arbitrary array-index $3\times3$ pooling.
-  \item Required full contributing-area validity. Invalid CNN inputs were zero-filled; affected GEDI labels were masked.
-  \item Kept the original 202 EnMAP bands; computed band means and standard deviations from training patches only.
-  \item Used exactly the same prepared target arrays, split manifest and target normalization for TESSERA and EnMAP.
+  \item Area-averaged native 10 m TESSERA embeddings onto each original 30 m HyBiomass grid, retaining all 128 channels. Required full contributing-area validity; invalid inputs were zero-filled and affected GEDI labels were masked.
+  \item Used the same prepared target arrays, target normalization and source-tile split for TESSERA and EnMAP. EnMAP retained all 202 original bands, normalized using training-only band statistics.
 \end{itemize}
 
 \begin{table}[h]
 \centering
-\caption{Prepared patches and usable GEDI labels after 30 m aggregation}
+\caption{Prepared patches and usable GEDI labels after aggregation}
 \small
 \begin{tabular}{@{}lrr@{}}
 \toprule
@@ -124,19 +92,8 @@ Total & 34,223 & 14,030,381 \\
 \end{table}
 
 \begin{itemize}
-  \item Original total: 34,232 patches. Nine had no usable labels after masking and were skipped.
-  \item Prepared TESSERA inputs: 237 GiB. Prepared EnMAP inputs: 156 GiB.
-  \item EnMAP-year matching is used; it does not guarantee a match to the GEDI observation year.
-\end{itemize}
-
-\section*{5. Training setup}
-\begin{itemize}
-  \item Model: two-stage U-Net with 256/512 encoder channels and a 1024-channel bottleneck; one AGBD output.
-  \item Input width: 128 channels for TESSERA; 202 for EnMAP. EnMAP was trained from scratch.
-  \item Loss: masked per-patch RMSE, averaged over each batch. Target mean/std came from training labels only.
-  \item Training: seed 42, batch size 4, Adam learning rate $10^{-4}$, BF16 autocast, 80 epochs, one GPU reported as NVIDIA L40.
-  \item Split: source-tile-grouped 70/20/10 scheme. Exact counts are below.
-  \item Checkpoint selection: lowest validation mean patch RMSE. Test predictions were clipped to zero.
+  \item Both models use the same U-Net, masked per-patch RMSE loss, batch size 4, Adam $10^{-4}$, BF16 and 80 epochs. The best-validation checkpoint was evaluated on the held-out test set with predictions clipped to zero.
+  \item Pixel-weighted RMSE pools all valid test pixels. Mean patch RMSE first computes RMSE within each patch, then weights all patches equally.
 \end{itemize}
 
 \begin{table}[h]
@@ -154,13 +111,11 @@ Test & 3,182 & 9.30 \\
 \end{tabular}
 \end{table}
 
+\section*{3. Held-out test results}
 \begin{itemize}
-  \item Training and validation together: 90.70\%; held-out test: 9.30\%.
-  \item Test evaluation uses 1,340,952 valid labeled pixels for each model.
-  \item Pixel-weighted RMSE pools labeled pixels. Mean patch RMSE gives each patch equal weight.
+  \item Test evaluation uses the same 3,182 patches and 1,340,952 valid labeled pixels for TESSERA and EnMAP. The constant predictor always predicts the training-label mean of 145.64 Mg/ha.
 \end{itemize}
 
-\section*{6. Held-out test results}
 \begin{table}[h]
 \centering
 \caption{Overall test performance}
@@ -177,8 +132,7 @@ Constant training mean & 112.65 & 107.40 & $\approx0$ \\
 \end{table}
 
 \begin{itemize}
-  \item TESSERA pixel RMSE is 12.84 Mg/ha (14.4\%) lower than the matched EnMAP baseline.
-  \item The constant predictor predicts 145.64 Mg/ha everywhere.
+  \item TESSERA reduced pixel RMSE by 12.84 Mg/ha (14.4\%) relative to the matched EnMAP model.
 \end{itemize}
 
 \begin{table}[h]
@@ -215,13 +169,11 @@ EnMAP + U-Net & 35 & 86.27 & 79.72 & 0.404 \\
 \end{tabular}
 \end{table}
 
+\section*{4. RMSE by GEDI reference biomass}
 \begin{itemize}
-  \item Training loss continued to decrease after the best epoch while validation error worsened.
-  \item Test metrics use the best-validation checkpoints, not epoch 80.
+  \item Bins use the GEDI reference value; RMSE compares the model's predictions with that reference on identical test pixels.
+  \item Bins include the lower bound and exclude the upper bound, except 400+. Values are pixel-weighted, not mean patch RMSE.
 \end{itemize}
-
-\section*{7. RMSE by GEDI reference biomass}
-Bins are based on the GEDI reference value; RMSE compares model predictions with that reference. Bins include the lower bound and exclude the upper bound, except 400+.
 
 \begin{table}[h]
 \centering
@@ -280,36 +232,17 @@ Total & 580,776 & 382,177 & 228,146 & 102,160 & 47,693 \\
 \end{tabular}
 \end{table}
 
-\section*{8. AlphaEarth experiment}
+\section*{5. AlphaEarth experiment}
 \begin{itemize}
-  \item Source: public annual AlphaEarth Satellite Embedding V1 COGs and Parquet index on Source Cooperative.
-  \item Each 10 m pixel has 64 channels, $A00$--$A63$; annual years are matched to the EnMAP year.
-  \item Dequantization: $\mathrm{sign}(x)(x/127.5)^2$; $-128$ is masked.
-  \item Remote band chunks are fetched in parallel, then area-averaged onto the exact 30 m HyBiomass grid.
-  \item Aggregated vectors are normalized to unit Euclidean length following Google's downsample guidance.
-  \item Model and training settings match the other runs, except the required 64-channel first convolution.
-  \item A real 12-patch GPU pilot completed with batch size 4 and about 1.05 GiB allocated memory.
-  \item Full preparation started on 27 November 2026; full training and results are pending.
+  \item Dequantized 64-channel annual embeddings with $\mathrm{sign}(x)(x/127.5)^2$, area-averaged them onto the exact 30 m patch grids, and normalized each vector to unit Euclidean length.
+  \item The U-Net uses the same splits and training settings as TESSERA, with 64 input channels. A real GPU pilot completed; full training and results are pending.
 \end{itemize}
 
-\section*{9. Limitations}
+\section*{6. Limitations}
 \begin{itemize}
-  \item One split and seed per completed model; no uncertainty intervals yet.
-  \item Current test results have been inspected; avoid repeated test-set tuning.
-  \item Source-tile grouping does not guarantee independent geographic holdouts.
-  \item TESSERA and EnMAP differ in pretraining, sensors and temporal information; the comparison does not isolate the cause of the gap.
-  \item The TESSERA BioMassters result (27.43 Mg/ha mean patch RMSE) is not directly comparable: different dataset, labels, resolution and splits.
-  \item Africa's 400+ bin has only 59 labels; small or spatially correlated samples may be unstable.
-  \item Next checks: repeated initialization seeds, a separate geographic holdout, and completion of the matched AlphaEarth run.
-\end{itemize}
-
-\section*{Main artifacts on siena09}
-\begin{itemize}
-  \item \texttt{data/runs/tessera\_v11\_unet\_02/}
-  \item \texttt{data/runs/enmap\_unet\_01/}
-  \item \texttt{data/runs/per\_bin\_rmse.json}
-  \item \texttt{data/runs/per\_region\_bin\_rmse.json}
-  \item AlphaEarth run/log: \texttt{data/alphaearth\_baseline.log}
+  \item One split and seed per completed model; no uncertainty intervals. The test set has already been inspected, so it should not be used repeatedly for tuning.
+  \item EnMAP was trained from scratch. Source-tile grouping does not guarantee independent geographic holdouts; Africa's 400+ bin has only 59 labels.
+  \item TESSERA's BioMassters result is not directly comparable because its dataset, labels, resolution and splits differ from HyBiomass.
 \end{itemize}
 
 \end{document}
