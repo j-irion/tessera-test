@@ -22,15 +22,15 @@ from check_coverage import DATA, REGIONS
 
 def aggregate_embeddings(embeddings, source_transform, source_crs, target_shape, target_transform, target_crs):
     """Area-average valid embeddings and require full coverage of each target cell."""
-    if embeddings.ndim != 3 or embeddings.shape[-1] != 128:
-        raise ValueError("Expected an H x W x 128 TESSERA embedding array")
+    if embeddings.ndim != 3:
+        raise ValueError("Expected an H x W x channels embedding array")
     # Pad missing source extent so area averages cannot treat raster edges as fully covered.
     embeddings = np.pad(embeddings, ((4, 4), (4, 4), (0, 0)), constant_values=np.nan)
     source_transform = source_transform @ Affine.translation(-4, -4)
     src = np.moveaxis(embeddings, -1, 0).astype(np.float32, copy=False)
     good = np.isfinite(src).all(axis=0)
     src[:, ~good] = np.nan
-    result = np.full((128, *target_shape), np.nan, dtype=np.float32)
+    result = np.full((embeddings.shape[-1], *target_shape), np.nan, dtype=np.float32)
     common = dict(src_transform=source_transform, src_crs=source_crs,
                   dst_transform=target_transform, dst_crs=target_crs,
                   resampling=Resampling.average, num_threads=2)
@@ -70,7 +70,7 @@ def read_and_aggregate(client, image, year):
     return result, valid
 
 
-def save_patch(path, embeddings, target, valid, year, crs, transform):
+def save_patch(path, embeddings, target, valid, year, crs, transform, dataset="1.1/dclimate"):
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         raise FileExistsError(f"Refusing to overwrite {path}")
@@ -79,7 +79,7 @@ def save_patch(path, embeddings, target, valid, year, crs, transform):
         with os.fdopen(fd, "wb") as out:
             np.savez_compressed(out, embeddings=embeddings, target=target, valid=valid,
                                 year=year, crs=str(crs), transform=tuple(transform)[:6],
-                                dataset="1.1/dclimate")
+                                dataset=dataset)
         os.link(temporary, path)
     finally:
         os.unlink(temporary)
