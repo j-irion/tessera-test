@@ -107,10 +107,10 @@ def enmap_stats(paths, input_dir):
 
 
 class PreparedDataset(Dataset):
-    def __init__(self, paths, mean, std, input_dir=None, input_mean=None, input_std=None, input_channels=128):
+    def __init__(self, paths, mean, std, input_dir=None, input_mean=None, input_std=None, input_channels=128, embedding_dir=None):
         self.paths, self.mean, self.std = paths, mean, std
         self.input_dir, self.input_mean, self.input_std = input_dir, input_mean, input_std
-        self.input_channels = input_channels
+        self.input_channels, self.embedding_dir = input_channels, embedding_dir
 
     def __len__(self):
         return len(self.paths)
@@ -120,6 +120,10 @@ class PreparedDataset(Dataset):
             embeddings = data["embeddings"].astype(np.float32) if self.input_dir is None else None
             target = data["target"].astype(np.float32)
             valid = data["valid"].astype(bool)
+        if self.embedding_dir is not None:
+            with np.load(enmap_path(self.paths[index], self.embedding_dir), allow_pickle=False) as data:
+                embeddings = data["embeddings"].astype(np.float32)
+                valid &= data["valid"]
         if self.input_dir is not None:
             with np.load(enmap_path(self.paths[index], self.input_dir), allow_pickle=False) as data:
                 embeddings = data["image"].astype(np.float32)
@@ -192,6 +196,7 @@ def main():
     parser.add_argument("--data", type=Path, default=Path("data/prepared"))
     parser.add_argument("--input", choices=("tessera", "enmap", "alphaearth"), default="tessera")
     parser.add_argument("--enmap-data", type=Path, default=Path("data/enmap"))
+    parser.add_argument("--embedding-data", type=Path, help="Separate directory for AlphaEarth prepared inputs")
     parser.add_argument("--reference-run", type=Path, help="TESSERA run whose exact split and target stats are matched")
     parser.add_argument("--run", type=Path, required=True)
     parser.add_argument("--epochs", type=int, default=80)
@@ -205,6 +210,8 @@ def main():
         parser.error("epochs and batch size must be positive; workers cannot be negative")
     if args.input != "tessera" and args.reference_run is None:
         parser.error("--reference-run is required for matched baseline experiments")
+    if args.input == "alphaearth" and args.embedding_data is None:
+        parser.error("--embedding-data is required for AlphaEarth")
     if args.device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA is unavailable; no training was started")
     random.seed(args.seed)
@@ -233,7 +240,7 @@ def main():
         manifest = json.loads((args.run / "manifest.json").read_text())
         if manifest["splits"] != split_manifest:
             raise ValueError("Prepared dataset or split differs from the original run")
-        for key in ("data", "seed", "batch_size", "device", "input", "enmap_data", "reference_run"):
+        for key in ("data", "seed", "batch_size", "device", "input", "enmap_data", "embedding_data", "reference_run"):
             original = manifest["config"].get(key, "tessera" if key == "input" else None)
             current = str(getattr(args, key)) if isinstance(getattr(args, key), Path) else getattr(args, key)
             if original != current and not (key == "enmap_data" and args.input == "tessera"):
@@ -256,7 +263,7 @@ def main():
     device = torch.device(args.device)
     input_dir = args.enmap_data if args.input == "enmap" else None
     channels = 202 if args.input == "enmap" else 64 if args.input == "alphaearth" else 128
-    loaders = {name: DataLoader(PreparedDataset(paths, mean, std, input_dir, input_mean, input_std, channels), batch_size=args.batch_size,
+    loaders = {name: DataLoader(PreparedDataset(paths, mean, std, input_dir, input_mean, input_std, channels, args.embedding_data), batch_size=args.batch_size,
                                 shuffle=name == "train", num_workers=args.workers,
                                 pin_memory=device.type == "cuda") for name, paths in splits.items()}
     if not args.resume:
