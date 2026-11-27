@@ -61,6 +61,34 @@ Regional RMSE is affected by biomass distributions, test-set size and GEDI label
 
 The bins use the original GEDI reference value, not the prediction. Intervals include their lower bound and exclude their upper bound; the last bin includes 400. The 580,776 test labels below 100 Mg/ha are excluded from the requested table. Both models were evaluated on the same pixels using their best-validation checkpoints and nonnegative-clipped predictions. RMSE is pooled over pixels in each bin; it is not mean patch RMSE. Higher absolute error in the high-biomass bins does not by itself establish whether predictions are systematically too high or too low.
 
+### Per-region and biomass-bin test RMSE
+
+Each cell is **TESSERA / EnMAP** pixel-weighted RMSE in Mg/ha; lower is better. Bins refer to the GEDI reference and use the same boundaries as above.
+
+| Region | 100 to <200 | 200 to <300 | 300 to <400 | 400+ |
+|---|---:|---:|---:|---:|
+| Africa | 86.89 / 71.56 | 108.09 / 103.21 | 182.09 / 184.90 | 283.61 / 277.31 |
+| Australasia | 65.23 / 62.78 | 73.34 / 75.84 | 131.48 / 145.10 | 205.30 / 227.71 |
+| Europe | 51.72 / 50.02 | 62.12 / 75.77 | 111.94 / 143.86 | 199.02 / 240.32 |
+| North America | 66.31 / 56.08 | 73.76 / 89.89 | 108.08 / 155.98 | 167.33 / 234.97 |
+| North Asia | 54.92 / 53.47 | 76.36 / 77.99 | 119.04 / 141.12 | 182.79 / 219.44 |
+| South America | 62.30 / 63.20 | 69.75 / 67.28 | 141.47 / 143.64 | 243.96 / 249.14 |
+| South Asia | 61.62 / 54.91 | 67.60 / 80.21 | 121.60 / 150.54 | 199.76 / 235.36 |
+
+Test GEDI pixel counts, identical for both models:
+
+| Region | 100 to <200 | 200 to <300 | 300 to <400 | 400+ |
+|---|---:|---:|---:|---:|
+| Africa | 2,799 | 1,327 | 298 | 59 |
+| Australasia | 42,706 | 28,205 | 14,209 | 7,739 |
+| Europe | 61,705 | 36,794 | 8,120 | 1,065 |
+| North America | 148,054 | 83,426 | 45,897 | 24,868 |
+| North Asia | 55,537 | 28,873 | 11,666 | 4,605 |
+| South America | 33,012 | 24,688 | 9,396 | 3,149 |
+| South Asia | 38,364 | 24,833 | 12,574 | 6,208 |
+
+The highest Africa bin has only 59 test labels; results in small or spatially correlated samples may be unstable. No uncertainty intervals were calculated.
+
 ## Validation and overfitting
 
 | Run | Best epoch | Best validation pixel RMSE (Mg/ha) | Best validation mean patch RMSE (Mg/ha) | Best validation R² | Epoch 80 validation mean patch RMSE (Mg/ha) |
@@ -84,5 +112,6 @@ Training loss continued decreasing after each run's best validation checkpoint w
 - EnMAP run: `~/tessera-test/data/runs/enmap_unet_01/`
 - Constant baseline metrics: `~/tessera-test/data/runs/mean_baseline.json`
 - Per-biomass-bin test results: `~/tessera-test/data/runs/per_bin_rmse.json`
+- Per-region, per-bin test results: `~/tessera-test/data/runs/per_region_bin_rmse.json`
 - Each model run contains `manifest.json`, `metrics.jsonl`, `best.pt`, `last.pt` and `test_metrics.json`.
 - Preparation/training details: [`EXPERIMENT.md`](EXPERIMENT.md) and [`ENMAP_BASELINE.md`](ENMAP_BASELINE.md).
