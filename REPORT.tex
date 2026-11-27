@@ -1,6 +1,7 @@
 \documentclass[11pt]{article}
 \usepackage[a4paper,margin=1.8cm]{geometry}
 \usepackage{booktabs}
+\usepackage{float}
 \usepackage{hyperref}
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{3pt}
@@ -14,235 +15,235 @@
 
 \section*{1. TESSERA embedding coverage}
 \begin{itemize}
-  \item v2: checked every GEDI label center against published tile inventories for the patch's EnMAP year. These are inventory matches, not exact-pixel validity checks.
-  \item Beta2: 125,268 of 14,096,147 labels (0.89\%) matched listed tiles; all were in Europe.
+	\item v2: checked every GEDI label center against published tile inventories for the patch's EnMAP year. These are inventory matches, not exact-pixel validity checks.
+	\item Beta2: 125,268 of 14,096,147 labels (0.89\%) matched listed tiles; all were in Europe.
 \end{itemize}
 
-\begin{table}[h]
-\centering
-\caption{TESSERA v2 beta1 tile-inventory coverage}
-\small
-\begin{tabular}{@{}lrrr@{}}
-\toprule
-Region & Matched labels & Total labels & Coverage (\%) \\
-\midrule
-Africa & 4,581 & 309,086 & 1.48 \\
-Australasia & 21,084 & 2,277,763 & 0.93 \\
-Europe & 522,119 & 2,191,681 & 23.82 \\
-North America & 50,033 & 4,788,856 & 1.04 \\
-North Asia & 9,860 & 1,374,919 & 0.72 \\
-South America & 9,688 & 1,624,880 & 0.60 \\
-South Asia & 3,701 & 1,528,962 & 0.24 \\
-\midrule
-Total & 621,066 & 14,096,147 & 4.41 \\
-\bottomrule
-\end{tabular}
+\begin{table}[H]
+	\centering
+	\caption{TESSERA v2 beta1 tile-inventory coverage}
+	\small
+	\begin{tabular}{@{}lrrr@{}}
+		\toprule
+		Region        & Matched labels & Total labels & Coverage (\%) \\
+		\midrule
+		Africa        & 4,581          & 309,086      & 1.48          \\
+		Australasia   & 21,084         & 2,277,763    & 0.93          \\
+		Europe        & 522,119        & 2,191,681    & 23.82         \\
+		North America & 50,033         & 4,788,856    & 1.04          \\
+		North Asia    & 9,860          & 1,374,919    & 0.72          \\
+		South America & 9,688          & 1,624,880    & 0.60          \\
+		South Asia    & 3,701          & 1,528,962    & 0.24          \\
+		\midrule
+		Total         & 621,066        & 14,096,147   & 4.41          \\
+		\bottomrule
+	\end{tabular}
 \end{table}
 
 \begin{itemize}
-  \item v1.1: read the scale value at every GEDI label center for the patch's EnMAP year and nominal UTM zone. A finite scale indicates an available embedding.
+	\item v1.1: read the scale value at every GEDI label center for the patch's EnMAP year and nominal UTM zone. A finite scale indicates an available embedding.
 \end{itemize}
 
-\begin{table}[h]
-\centering
-\caption{TESSERA v1.1 valid-pixel coverage before 30 m aggregation}
-\small
-\begin{tabular}{@{}lrrr@{}}
-\toprule
-Region & Valid labels & Total labels & Coverage (\%) \\
-\midrule
-Africa & 307,669 & 309,086 & 99.54 \\
-Australasia & 2,275,563 & 2,277,763 & 99.90 \\
-Europe & 2,184,520 & 2,191,681 & 99.67 \\
-North America & 4,776,484 & 4,788,856 & 99.74 \\
-North Asia & 1,365,801 & 1,374,919 & 99.34 \\
-South America & 1,615,822 & 1,624,880 & 99.44 \\
-South Asia & 1,524,799 & 1,528,962 & 99.73 \\
-\midrule
-Total & 14,050,658 & 14,096,147 & 99.68 \\
-\bottomrule
-\end{tabular}
+\begin{table}[H]
+	\centering
+	\caption{TESSERA v1.1 valid-pixel coverage before 30 m aggregation}
+	\small
+	\begin{tabular}{@{}lrrr@{}}
+		\toprule
+		Region        & Valid labels & Total labels & Coverage (\%) \\
+		\midrule
+		Africa        & 307,669      & 309,086      & 99.54         \\
+		Australasia   & 2,275,563    & 2,277,763    & 99.90         \\
+		Europe        & 2,184,520    & 2,191,681    & 99.67         \\
+		North America & 4,776,484    & 4,788,856    & 99.74         \\
+		North Asia    & 1,365,801    & 1,374,919    & 99.34         \\
+		South America & 1,615,822    & 1,624,880    & 99.44         \\
+		South Asia    & 1,524,799    & 1,528,962    & 99.73         \\
+		\midrule
+		Total         & 14,050,658   & 14,096,147   & 99.68         \\
+		\bottomrule
+	\end{tabular}
 \end{table}
 
 \section*{2. Prepared patches and experiment setup}
 \begin{itemize}
-  \item Area-averaged native 10 m TESSERA embeddings onto each original 30 m HyBiomass grid, retaining all 128 channels. Required full contributing-area validity; invalid inputs were zero-filled and affected GEDI labels were masked.
-  \item Used the same prepared target arrays, target normalization and source-tile split for TESSERA and EnMAP. EnMAP retained all 202 original bands, normalized using training-only band statistics.
+	\item Area-averaged native 10 m TESSERA embeddings onto each original 30 m HyBiomass grid, retaining all 128 channels. Required full contributing-area validity; invalid inputs were zero-filled and affected GEDI labels were masked.
+	\item Used the same prepared target arrays, target normalization and source-tile split for TESSERA and EnMAP. EnMAP retained all 202 original bands, normalized using training-only band statistics.
 \end{itemize}
 
-\begin{table}[h]
-\centering
-\caption{Prepared patches and usable GEDI labels after aggregation}
-\small
-\begin{tabular}{@{}lrr@{}}
-\toprule
-Region & Prepared patches & Usable labels \\
-\midrule
-Africa & 1,041 & 307,336 \\
-Australasia & 5,626 & 2,273,671 \\
-Europe & 5,225 & 2,180,505 \\
-North America & 9,566 & 4,770,564 \\
-North Asia & 3,743 & 1,362,370 \\
-South America & 4,725 & 1,612,780 \\
-South Asia & 4,297 & 1,523,155 \\
-\midrule
-Total & 34,223 & 14,030,381 \\
-\bottomrule
-\end{tabular}
+\begin{table}[H]
+	\centering
+	\caption{Prepared patches and usable GEDI labels after aggregation}
+	\small
+	\begin{tabular}{@{}lrr@{}}
+		\toprule
+		Region        & Prepared patches & Usable labels \\
+		\midrule
+		Africa        & 1,041            & 307,336       \\
+		Australasia   & 5,626            & 2,273,671     \\
+		Europe        & 5,225            & 2,180,505     \\
+		North America & 9,566            & 4,770,564     \\
+		North Asia    & 3,743            & 1,362,370     \\
+		South America & 4,725            & 1,612,780     \\
+		South Asia    & 4,297            & 1,523,155     \\
+		\midrule
+		Total         & 34,223           & 14,030,381    \\
+		\bottomrule
+	\end{tabular}
 \end{table}
 
 \begin{itemize}
-  \item Both models use the same U-Net, masked per-patch RMSE loss, batch size 4, Adam $10^{-4}$, BF16 and 80 epochs. The best-validation checkpoint was evaluated on the held-out test set with predictions clipped to zero.
-  \item Pixel-weighted RMSE pools all valid test pixels. Mean patch RMSE first computes RMSE within each patch, then weights all patches equally.
+	\item Both models use the same U-Net, masked per-patch RMSE loss, batch size 4, Adam $10^{-4}$, BF16 and 80 epochs. The best-validation checkpoint was evaluated on the held-out test set with predictions clipped to zero.
+	\item Pixel-weighted RMSE pools all valid test pixels. Mean patch RMSE first computes RMSE within each patch, then weights all patches equally.
 \end{itemize}
 
-\begin{table}[h]
-\centering
-\caption{Dataset split used by both models}
-\small
-\begin{tabular}{@{}lrr@{}}
-\toprule
-Split & Patches & Share (\%) \\
-\midrule
-Training & 24,318 & 71.06 \\
-Validation & 6,723 & 19.64 \\
-Test & 3,182 & 9.30 \\
-\bottomrule
-\end{tabular}
+\begin{table}[H]
+	\centering
+	\caption{Dataset split used by both models}
+	\small
+	\begin{tabular}{@{}lrr@{}}
+		\toprule
+		Split      & Patches & Share (\%) \\
+		\midrule
+		Training   & 24,318  & 71.06      \\
+		Validation & 6,723   & 19.64      \\
+		Test       & 3,182   & 9.30       \\
+		\bottomrule
+	\end{tabular}
 \end{table}
 
 \section*{3. Held-out test results}
 \begin{itemize}
-  \item Test evaluation uses the same 3,182 patches and 1,340,952 valid labeled pixels for TESSERA and EnMAP. The constant predictor always predicts the training-label mean of 145.64 Mg/ha.
+	\item Test evaluation uses the same 3,182 patches and 1,340,952 valid labeled pixels for TESSERA and EnMAP. The constant predictor always predicts the training-label mean of 145.64 Mg/ha.
 \end{itemize}
 
-\begin{table}[h]
-\centering
-\caption{Overall test performance}
-\small
-\begin{tabular}{@{}lrrr@{}}
-\toprule
-Input/predictor & Pixel RMSE (Mg/ha) $\downarrow$ & Mean patch RMSE $\downarrow$ & $R^2\uparrow$ \\
-\midrule
-TESSERA + U-Net & \textbf{76.34} & \textbf{70.43} & \textbf{0.541} \\
-EnMAP + U-Net & 89.18 & 81.53 & 0.373 \\
-Constant training mean & 112.65 & 107.40 & $\approx0$ \\
-\bottomrule
-\end{tabular}
+\begin{table}[H]
+	\centering
+	\caption{Overall test performance}
+	\small
+	\begin{tabular}{@{}lrrr@{}}
+		\toprule
+		Input/predictor        & Pixel RMSE (Mg/ha) $\downarrow$ & Mean patch RMSE $\downarrow$ & $R^2\uparrow$  \\
+		\midrule
+		TESSERA + U-Net        & \textbf{76.34}                  & \textbf{70.43}               & \textbf{0.541} \\
+		EnMAP + U-Net          & 89.18                           & 81.53                        & 0.373          \\
+		Constant training mean & 112.65                          & 107.40                       & $\approx0$     \\
+		\bottomrule
+	\end{tabular}
 \end{table}
 
 \begin{itemize}
-  \item TESSERA reduced pixel RMSE by 12.84 Mg/ha (14.4\%) relative to the matched EnMAP model.
+	\item TESSERA reduced pixel RMSE by 12.84 Mg/ha (14.4\%) relative to the matched EnMAP model.
 \end{itemize}
 
-\begin{table}[h]
-\centering
-\caption{Regional test metrics; TESSERA / EnMAP}
-\small
-\begin{tabular}{@{}lrrrr@{}}
-\toprule
-Region & Test patches & Pixel RMSE (Mg/ha) $\downarrow$ & \multicolumn{2}{c}{$R^2\uparrow$} \\
- & & TESSERA / EnMAP & TESSERA & EnMAP \\
-\midrule
-Africa & 65 & 59.75 / \textbf{59.44} & 0.459 & \textbf{0.465} \\
-Australasia & 409 & \textbf{84.40} / 92.26 & \textbf{0.515} & 0.421 \\
-Europe & 510 & \textbf{55.89} / 67.92 & \textbf{0.607} & 0.420 \\
-North America & 971 & \textbf{77.44} / 95.27 & \textbf{0.558} & 0.331 \\
-North Asia & 452 & \textbf{76.43} / 87.13 & \textbf{0.455} & 0.291 \\
-South America & 437 & \textbf{78.07} / 84.77 & \textbf{0.554} & 0.474 \\
-South Asia & 338 & \textbf{89.27} / 100.21 & \textbf{0.420} & 0.270 \\
-\bottomrule
-\end{tabular}
+\begin{table}[H]
+	\centering
+	\caption{Regional test metrics; TESSERA / EnMAP}
+	\small
+	\begin{tabular}{@{}lrrrr@{}}
+		\toprule
+		Region        & Test patches & Pixel RMSE (Mg/ha) $\downarrow$ & \multicolumn{2}{c}{$R^2\uparrow$}                  \\
+		              &              & TESSERA / EnMAP                 & TESSERA                           & EnMAP          \\
+		\midrule
+		Africa        & 65           & 59.75 / \textbf{59.44}          & 0.459                             & \textbf{0.465} \\
+		Australasia   & 409          & \textbf{84.40} / 92.26          & \textbf{0.515}                    & 0.421          \\
+		Europe        & 510          & \textbf{55.89} / 67.92          & \textbf{0.607}                    & 0.420          \\
+		North America & 971          & \textbf{77.44} / 95.27          & \textbf{0.558}                    & 0.331          \\
+		North Asia    & 452          & \textbf{76.43} / 87.13          & \textbf{0.455}                    & 0.291          \\
+		South America & 437          & \textbf{78.07} / 84.77          & \textbf{0.554}                    & 0.474          \\
+		South Asia    & 338          & \textbf{89.27} / 100.21         & \textbf{0.420}                    & 0.270          \\
+		\bottomrule
+	\end{tabular}
 \end{table}
 
-\begin{table}[h]
-\centering
-\caption{Validation and checkpoint selection}
-\small
-\begin{tabular}{@{}lrrrr@{}}
-\toprule
-Run & Best epoch & Val. pixel RMSE & Val. mean patch RMSE & Val. $R^2$ \\
-\midrule
-TESSERA + U-Net & 26 & 74.50 & 68.69 & 0.555 \\
-EnMAP + U-Net & 35 & 86.27 & 79.72 & 0.404 \\
-\bottomrule
-\end{tabular}
+\begin{table}[H]
+	\centering
+	\caption{Validation and checkpoint selection}
+	\small
+	\begin{tabular}{@{}lrrrr@{}}
+		\toprule
+		Run             & Best epoch & Val. pixel RMSE & Val. mean patch RMSE & Val. $R^2$ \\
+		\midrule
+		TESSERA + U-Net & 26         & 74.50           & 68.69                & 0.555      \\
+		EnMAP + U-Net   & 35         & 86.27           & 79.72                & 0.404      \\
+		\bottomrule
+	\end{tabular}
 \end{table}
 
 \section*{4. RMSE by GEDI reference biomass}
 \begin{itemize}
-  \item Bins use the GEDI reference value; RMSE compares the model's predictions with that reference on identical test pixels.
-  \item Bins include the lower bound and exclude the upper bound, except 400+. Values are pixel-weighted, not mean patch RMSE.
+	\item Bins use the GEDI reference value; RMSE compares the model's predictions with that reference on identical test pixels.
+	\item Bins include the lower bound and exclude the upper bound, except 400+. Values are pixel-weighted, not mean patch RMSE.
 \end{itemize}
 
-\begin{table}[h]
-\centering
-\caption{All-region test pixel RMSE by reference-biomass bin}
-\small
-\begin{tabular}{@{}lrrr@{}}
-\toprule
-GEDI bin (Mg/ha) & Test labels & TESSERA RMSE $\downarrow$ & EnMAP RMSE $\downarrow$ \\
-\midrule
-0 to $<100$ & 580,776 & \textbf{60.10} & 72.35 \\
-100 to $<200$ & 382,177 & 61.81 & \textbf{56.25} \\
-200 to $<300$ & 228,146 & \textbf{71.46} & 81.32 \\
-300 to $<400$ & 102,160 & \textbf{118.42} & 150.21 \\
-400+ & 47,693 & \textbf{186.47} & 233.55 \\
-\bottomrule
-\end{tabular}
+\begin{table}[H]
+	\centering
+	\caption{All-region test pixel RMSE by reference-biomass bin}
+	\small
+	\begin{tabular}{@{}lrrr@{}}
+		\toprule
+		GEDI bin (Mg/ha) & Test labels & TESSERA RMSE $\downarrow$ & EnMAP RMSE $\downarrow$ \\
+		\midrule
+		0 to $<100$      & 580,776     & \textbf{60.10}            & 72.35                   \\
+		100 to $<200$    & 382,177     & 61.81                     & \textbf{56.25}          \\
+		200 to $<300$    & 228,146     & \textbf{71.46}            & 81.32                   \\
+		300 to $<400$    & 102,160     & \textbf{118.42}           & 150.21                  \\
+		400+             & 47,693      & \textbf{186.47}           & 233.55                  \\
+		\bottomrule
+	\end{tabular}
 \end{table}
 
-\begin{table}[h]
-\centering
-\caption{Per-region, per-bin pixel RMSE; TESSERA / EnMAP (Mg/ha)}
-\scriptsize
-\begin{tabular}{@{}lrrrrr@{}}
-\toprule
-Region & 0 to $<100$ & 100 to $<200$ & 200 to $<300$ & 300 to $<400$ & 400+ \\
-\midrule
-Africa & 27.89 / 36.98 & 86.89 / 71.56 & 108.09 / 103.21 & 182.09 / 184.90 & 283.61 / 277.31 \\
-Australasia & 63.83 / 74.18 & 65.23 / 62.78 & 73.34 / 75.84 & 131.48 / 145.10 & 205.30 / 227.71 \\
-Europe & 44.67 / 60.37 & 51.72 / 50.02 & 62.12 / 75.77 & 111.94 / 143.86 & 199.02 / 240.32 \\
-North America & 60.64 / 71.83 & 66.31 / 56.08 & 73.76 / 89.89 & 108.08 / 155.98 & 167.33 / 234.97 \\
-North Asia & 68.69 / 84.75 & 54.92 / 53.47 & 76.36 / 77.99 & 119.04 / 141.12 & 182.79 / 219.44 \\
-South America & 55.44 / 72.15 & 62.30 / 63.20 & 69.75 / 67.28 & 141.47 / 143.64 & 243.96 / 249.14 \\
-South Asia & 82.88 / 88.26 & 61.62 / 54.91 & 67.60 / 80.21 & 121.60 / 150.54 & 199.76 / 235.36 \\
-\bottomrule
-\end{tabular}
+\begin{table}[H]
+	\centering
+	\caption{Per-region, per-bin pixel RMSE; TESSERA / EnMAP (Mg/ha)}
+	\scriptsize
+	\begin{tabular}{@{}lrrrrr@{}}
+		\toprule
+		Region        & 0 to $<100$   & 100 to $<200$ & 200 to $<300$   & 300 to $<400$   & 400+            \\
+		\midrule
+		Africa        & 27.89 / 36.98 & 86.89 / 71.56 & 108.09 / 103.21 & 182.09 / 184.90 & 283.61 / 277.31 \\
+		Australasia   & 63.83 / 74.18 & 65.23 / 62.78 & 73.34 / 75.84   & 131.48 / 145.10 & 205.30 / 227.71 \\
+		Europe        & 44.67 / 60.37 & 51.72 / 50.02 & 62.12 / 75.77   & 111.94 / 143.86 & 199.02 / 240.32 \\
+		North America & 60.64 / 71.83 & 66.31 / 56.08 & 73.76 / 89.89   & 108.08 / 155.98 & 167.33 / 234.97 \\
+		North Asia    & 68.69 / 84.75 & 54.92 / 53.47 & 76.36 / 77.99   & 119.04 / 141.12 & 182.79 / 219.44 \\
+		South America & 55.44 / 72.15 & 62.30 / 63.20 & 69.75 / 67.28   & 141.47 / 143.64 & 243.96 / 249.14 \\
+		South Asia    & 82.88 / 88.26 & 61.62 / 54.91 & 67.60 / 80.21   & 121.60 / 150.54 & 199.76 / 235.36 \\
+		\bottomrule
+	\end{tabular}
 \end{table}
 
-\begin{table}[h]
-\centering
-\caption{Held-out test label counts by region and GEDI bin}
-\small
-\begin{tabular}{@{}lrrrrr@{}}
-\toprule
-Region & 0 to $<100$ & 100 to $<200$ & 200 to $<300$ & 300 to $<400$ & 400+ \\
-\midrule
-Africa & 12,631 & 2,799 & 1,327 & 298 & 59 \\
-Australasia & 79,985 & 42,706 & 28,205 & 14,209 & 7,739 \\
-Europe & 101,623 & 61,705 & 36,794 & 8,120 & 1,065 \\
-North America & 226,315 & 148,054 & 83,426 & 45,897 & 24,868 \\
-North Asia & 59,476 & 55,537 & 28,873 & 11,666 & 4,605 \\
-South America & 64,748 & 33,012 & 24,688 & 9,396 & 3,149 \\
-South Asia & 35,998 & 38,364 & 24,833 & 12,574 & 6,208 \\
-\midrule
-Total & 580,776 & 382,177 & 228,146 & 102,160 & 47,693 \\
-\bottomrule
-\end{tabular}
+\begin{table}[H]
+	\centering
+	\caption{Held-out test label counts by region and GEDI bin}
+	\small
+	\begin{tabular}{@{}lrrrrr@{}}
+		\toprule
+		Region        & 0 to $<100$ & 100 to $<200$ & 200 to $<300$ & 300 to $<400$ & 400+   \\
+		\midrule
+		Africa        & 12,631      & 2,799         & 1,327         & 298           & 59     \\
+		Australasia   & 79,985      & 42,706        & 28,205        & 14,209        & 7,739  \\
+		Europe        & 101,623     & 61,705        & 36,794        & 8,120         & 1,065  \\
+		North America & 226,315     & 148,054       & 83,426        & 45,897        & 24,868 \\
+		North Asia    & 59,476      & 55,537        & 28,873        & 11,666        & 4,605  \\
+		South America & 64,748      & 33,012        & 24,688        & 9,396         & 3,149  \\
+		South Asia    & 35,998      & 38,364        & 24,833        & 12,574        & 6,208  \\
+		\midrule
+		Total         & 580,776     & 382,177       & 228,146       & 102,160       & 47,693 \\
+		\bottomrule
+	\end{tabular}
 \end{table}
 
 \section*{5. AlphaEarth experiment}
 \begin{itemize}
-  \item Dequantized 64-channel annual embeddings with $\mathrm{sign}(x)(x/127.5)^2$, area-averaged them onto the exact 30 m patch grids, and normalized each vector to unit Euclidean length.
-  \item The U-Net uses the same splits and training settings as TESSERA, with 64 input channels. A real GPU pilot completed; full training and results are pending.
+	\item Dequantized 64-channel annual embeddings with $\mathrm{sign}(x)(x/127.5)^2$, area-averaged them onto the exact 30 m patch grids, and normalized each vector to unit Euclidean length.
+	\item The U-Net uses the same splits and training settings as TESSERA, with 64 input channels. A real GPU pilot completed; full training and results are pending.
 \end{itemize}
 
 \section*{6. Limitations}
 \begin{itemize}
-  \item One split and seed per completed model; no uncertainty intervals. The test set has already been inspected, so it should not be used repeatedly for tuning.
-  \item EnMAP was trained from scratch. Source-tile grouping does not guarantee independent geographic holdouts; Africa's 400+ bin has only 59 labels.
-  \item TESSERA's BioMassters result is not directly comparable because its dataset, labels, resolution and splits differ from HyBiomass.
+	\item One split and seed per completed model; no uncertainty intervals. The test set has already been inspected, so it should not be used repeatedly for tuning.
+	\item EnMAP was trained from scratch. Source-tile grouping does not guarantee independent geographic holdouts; Africa's 400+ bin has only 59 labels.
+	\item TESSERA's BioMassters result is not directly comparable because its dataset, labels, resolution and splits differ from HyBiomass.
 \end{itemize}
 
 \end{document}
