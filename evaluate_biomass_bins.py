@@ -18,7 +18,7 @@ class BinDataset(PreparedDataset):
             target = data["target"].astype(np.float32)
             valid = data["valid"].astype(bool)
         target[~valid] = np.nan
-        return inputs, torch.from_numpy(target).unsqueeze(0)
+        return inputs, torch.from_numpy(target).unsqueeze(0), self.paths[index].parts[-3]
 
 
 def bin_sums(prediction, target):
@@ -29,6 +29,16 @@ def bin_sums(prediction, target):
     bins = torch.bucketize(actual, boundaries, right=True)
     return (torch.bincount(bins, minlength=5),
             torch.bincount(bins, weights=error.square(), minlength=5))
+
+
+def regional_sums(prediction, target, region_names):
+    if len(region_names) != len(target):
+        raise ValueError("Region count does not match batch size")
+    results = {}
+    for region in set(region_names):
+        selected = torch.tensor([name == region for name in region_names], device=target.device)
+        results[region] = bin_sums(prediction[selected], target[selected])
+    return results
 
 
 def evaluate(run, mode, workers=6):
@@ -47,15 +57,20 @@ def evaluate(run, mode, workers=6):
     model.load_state_dict(checkpoint["model"])
     counts = torch.zeros(5, device="cuda", dtype=torch.int64)
     errors = torch.zeros(5, device="cuda", dtype=torch.float64)
+    regions = {}
     with torch.inference_mode():
-        for i, (inputs, target) in enumerate(loader, 1):
+        for i, (inputs, target, region_names) in enumerate(loader, 1):
             inputs, target = inputs.cuda(non_blocking=True), target.cuda(non_blocking=True)
             with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
                 prediction = model(inputs).float()
             prediction = (prediction.double() * manifest["target_std"] + manifest["target_mean"]).clamp_min(0)
-            n, sse = bin_sums(prediction, target)
-            counts += n
-            errors += sse
+            for region, (n, sse) in regional_sums(prediction, target, region_names).items():
+                counts += n
+                errors += sse
+                if region not in regions:
+                    regions[region] = [torch.zeros_like(counts), torch.zeros_like(errors)]
+                regions[region][0] += n
+                regions[region][1] += sse
             if i % 100 == 0 or i == len(loader):
                 print(f"{mode}: evaluated {i}/{len(loader)} batches", flush=True)
     counts, errors = counts.cpu().numpy(), errors.cpu().numpy()
@@ -66,13 +81,17 @@ def evaluate(run, mode, workers=6):
     reference = json.loads((run / "test_metrics.json").read_text())
     if counts.sum() != reference["labels"] or abs(overall_rmse - reference["rmse_mg_ha"]) > 0.001:
         raise ValueError(f"{mode} results do not match saved overall test metrics")
+    regional = {}
+    for region, (n, sse) in sorted(regions.items()):
+        regional[region] = {label: {"count": int(count), "rmse_mg_ha": float(np.sqrt(error / count)) if count else None}
+                            for label, count, error in zip(labels, n.cpu().numpy(), sse.cpu().numpy())}
     return {"checkpoint_epoch": checkpoint["epoch"], "patches": len(paths),
-            "overall_rmse_mg_ha": overall_rmse, "bins": result}
+            "overall_rmse_mg_ha": overall_rmse, "bins": result, "regions": regional}
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=Path("data/runs/per_bin_rmse.json"))
+    parser.add_argument("--output", type=Path, default=Path("data/runs/per_region_bin_rmse.json"))
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(f"Refusing to overwrite {args.output}")
@@ -84,6 +103,14 @@ def main():
     results = {name: evaluate(run, name) for name, run in runs.items()}
     if [b["count"] for b in results["tessera"]["bins"].values()] != [b["count"] for b in results["enmap"]["bins"].values()]:
         raise ValueError("Test label counts differ across models")
+    for region, bins in results["tessera"]["regions"].items():
+        if region not in results["enmap"]["regions"] or any(
+            result["count"] != results["enmap"]["regions"][region][label]["count"]
+            for label, result in bins.items()
+        ):
+            raise ValueError(f"Test label counts differ in region {region}")
+    if results["tessera"]["regions"].keys() != results["enmap"]["regions"].keys():
+        raise ValueError("Test regions differ across models")
     with args.output.open("x") as f:
         json.dump(results, f, indent=2)
         f.write("\n")
